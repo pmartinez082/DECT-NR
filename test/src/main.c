@@ -161,9 +161,16 @@ static void on_pcc_crc_err(const struct nrf_modem_dect_phy_pcc_crc_failure_event
 /* Physical Data Channel reception notification. */
 static void on_pdc(const struct nrf_modem_dect_phy_pdc_event *evt)
 {
-	/* Received RSSI value is in fixed precision format Q14.1 */
-	LOG_INF("Received data (RSSI: %d.%d): %s",
-		(evt->rssi_2 / 2), (evt->rssi_2 & 0b1) * 5, (char *)evt->data);
+    /* Received RSSI value is in fixed precision format Q14.1 */
+    LOG_INF("Received data (RSSI: %d.%d): %s",
+        (evt->rssi_2 / 2), (evt->rssi_2 & 0b1) * 5, (char *)evt->data);
+
+    // Extract RSSI from received message if present
+    int received_rssi = 0;
+    char msg[DATA_LEN_MAX] = {0};
+    if (sscanf((char *)evt->data, "Hello DECT! %*d RSSI:%d", &received_rssi) == 1) {
+        LOG_INF("Transmitted RSSI value: %d", received_rssi);
+    }
 }
 
 /* Physical Data Channel CRC error notification. */
@@ -184,6 +191,10 @@ static void on_rssi(const struct nrf_modem_dect_phy_rssi_event *evt)
 	}
 	LOG_DBG("\n");
 	latest_rssi = evt->meas[evt->meas_len - 1]; // Save the latest RSSI value
+}
+
+static void on_snr(const struct nrf_modem_dect_phy_snr_event *evt){
+
 }
 
 static void on_stf_cover_seq_control(const struct nrf_modem_dect_phy_stf_control_event *evt)
@@ -397,10 +408,25 @@ int main(void)
 	}
 
 	while (1) {
+		/** Request RSSI measurement before transmitting */
+		struct nrf_modem_dect_phy_rssi_params nrf_modem_dect_phy_rssi_params = {
+			.start_time = 0,
+			.handle = rx_handle,
+			.carrier = CONFIG_CARRIER,
+			.duration = 1200, // 5ms
+			.reporting_interval = 600, // 2.5ms
+		
+		};
+		err = nrf_modem_dect_phy_rssi( &nrf_modem_dect_phy_rssi_params);
+		if (err) {
+			LOG_ERR("RSSI measurement request failed, err %d", err);
+			return err;
+		}
+		k_sem_take(&operation_sem, K_FOREVER); // Wait for RSSI event to update latest_rssi
+
 		/** Transmitting message */
 		LOG_INF("Transmitting %d", tx_counter_value);
-		// Include RSSI in the message
-		tx_len = sprintf(tx_buf, "Hello DECT! %d" , tx_counter_value);
+		tx_len = sprintf(tx_buf, "Hello DECT! %d RSSI:%d", tx_counter_value, latest_rssi);
 
 		err = transmit(tx_handle, tx_buf, tx_len);
 		if (err) {
