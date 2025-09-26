@@ -161,16 +161,9 @@ static void on_pcc_crc_err(const struct nrf_modem_dect_phy_pcc_crc_failure_event
 /* Physical Data Channel reception notification. */
 static void on_pdc(const struct nrf_modem_dect_phy_pdc_event *evt)
 {
-    /* Received RSSI value is in fixed precision format Q14.1 */
-    LOG_INF("Received data (RSSI: %d.%d): %s",
-        (evt->rssi_2 / 2), (evt->rssi_2 & 0b1) * 5, (char *)evt->data);
-
-    // Extract RSSI from received message if present
-    int received_rssi = 0;
-    char msg[DATA_LEN_MAX] = {0};
-    if (sscanf((char *)evt->data, "Hello DECT! %*d RSSI:%d", &received_rssi) == 1) {
-        LOG_INF("Transmitted RSSI value: %d", received_rssi);
-    }
+	/* Received RSSI value is in fixed precision format Q14.1 */
+	LOG_INF("Received data (RSSI: %d.%d): %s",
+		(evt->rssi_2 / 2), (evt->rssi_2 & 0b1) * 5, (char *)evt->data);
 }
 
 /* Physical Data Channel CRC error notification. */
@@ -179,22 +172,10 @@ static void on_pdc_crc_err(const struct nrf_modem_dect_phy_pdc_crc_failure_event
 	LOG_DBG("pdc_crc_err cb time %"PRIu64"", modem_time);
 }
 
-static int16_t latest_rssi = 0; // Store latest RSSI value
-
 /* RSSI measurement result notification. */
 static void on_rssi(const struct nrf_modem_dect_phy_rssi_event *evt)
 {
 	LOG_DBG("rssi cb time %"PRIu64" carrier %d", modem_time, evt->carrier);
-	LOG_DBG("RSSI measurements (len %d): ", evt->meas_len);
-	for (int i = 0; i < evt->meas_len; i++) {
-		LOG_DBG("%d ", evt->meas[i]);
-	}
-	LOG_DBG("\n");
-	latest_rssi = evt->meas[evt->meas_len - 1]; // Save the latest RSSI value
-}
-
-static void on_snr(const struct nrf_modem_dect_phy_snr_event *evt){
-
 }
 
 static void on_stf_cover_seq_control(const struct nrf_modem_dect_phy_stf_control_event *evt)
@@ -312,46 +293,15 @@ static int transmit(uint32_t handle, void *data, size_t data_len)
 	return 0;
 }
 
-/* Receive operation. */
-static int receive(uint32_t handle)
-{
-	int err;
-
-	struct nrf_modem_dect_phy_rx_params rx_op_params = {
-		.start_time = 0,
-		.handle = handle,
-		.network_id = CONFIG_NETWORK_ID,
-		.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS,
-		.rssi_interval = NRF_MODEM_DECT_PHY_RSSI_INTERVAL_OFF,
-		.link_id = NRF_MODEM_DECT_PHY_LINK_UNSPECIFIED,
-		.rssi_level = -60,
-		.carrier = CONFIG_CARRIER,
-		.duration = CONFIG_RX_PERIOD_S * MSEC_PER_SEC *
-			    NRF_MODEM_DECT_MODEM_TIME_TICK_RATE_KHZ,
-		.filter.short_network_id = CONFIG_NETWORK_ID & 0xff,
-		.filter.is_short_network_id_used = 1,
-		/* listen for everything (broadcast mode used) */
-		.filter.receiver_identity = 0,
-	};
-
-	err = nrf_modem_dect_phy_rx(&rx_op_params);
-	if (err != 0) {
-		return err;
-	}
-
-	return 0;
-}
-
 int main(void)
 {
 	int err;
 	uint32_t tx_handle = 0;
-	uint32_t rx_handle = 1;
 	uint32_t tx_counter_value = 0;
 	uint8_t tx_buf[DATA_LEN_MAX];
 	size_t tx_len;
 
-	LOG_INF("Dect NR+ PHY Hello sample started");
+	LOG_INF("Dect NR+ PHY Transmitter started");
 
 	err = nrf_modem_lib_init();
 	if (err) {
@@ -408,25 +358,12 @@ int main(void)
 	}
 
 	while (1) {
-		/** Request RSSI measurement before transmitting */
-		struct nrf_modem_dect_phy_rssi_params nrf_modem_dect_phy_rssi_params = {
-			.start_time = 0,
-			.handle = rx_handle,
-			.carrier = CONFIG_CARRIER,
-			.duration = 1200, // 5ms
-			.reporting_interval = 600, // 2.5ms
-		
-		};
-		err = nrf_modem_dect_phy_rssi( &nrf_modem_dect_phy_rssi_params);
-		if (err) {
-			LOG_ERR("RSSI measurement request failed, err %d", err);
-			return err;
-		}
-		k_sem_take(&operation_sem, K_FOREVER); // Wait for RSSI event to update latest_rssi
+		/* Sleep for 1 second between transmissions */
+		k_sleep(K_MSEC(1000));
 
 		/** Transmitting message */
 		LOG_INF("Transmitting %d", tx_counter_value);
-		tx_len = sprintf(tx_buf, "Hello DECT! %d RSSI:%d", tx_counter_value, latest_rssi);
+		tx_len = sprintf(tx_buf, "Hello DECT! %d", tx_counter_value);
 
 		err = transmit(tx_handle, tx_buf, tx_len);
 		if (err) {
@@ -444,16 +381,6 @@ int main(void)
 				CONFIG_TX_TRANSMISSIONS);
 			break;
 		}
-
-		/** Receiving messages for CONFIG_RX_PERIOD_S seconds. */
-		err = receive(rx_handle);
-		if (err) {
-			LOG_ERR("Reception failed, err %d", err);
-			return err;
-		}
-
-		/* Wait for RX operation to complete. */
-		k_sem_take(&operation_sem, K_FOREVER);
 	}
 
 	LOG_INF("Shutting down");
