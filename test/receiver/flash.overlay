@@ -1,0 +1,19 @@
+/* flash.overlay
+ *
+ * NVS storage partition for CSV logging.
+ * Must match the macros used in main.c: FIXED_PARTITION_DEVICE/OFFSET/SIZE.
+ * Placed at the end of flash (typical for nRF91 DK) and aligned to sector size.
+ */
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        nvs_storage: partition@f8000 {
+            label = "storage_partition";
+            reg = <0x000f8000 0x00008000>; /* 32 kB partition at 0xF8000 */
+        };
+    };
+};

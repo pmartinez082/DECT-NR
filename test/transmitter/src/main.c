@@ -10,6 +10,8 @@
 #include <modem/nrf_modem_lib.h>
 #include <zephyr/drivers/hwinfo.h>
 
+#define PREAMBLE_LEN 4
+
 LOG_MODULE_REGISTER(app);
 
 BUILD_ASSERT(CONFIG_CARRIER, "Carrier must be configured according to local regulations");
@@ -161,9 +163,8 @@ static void on_pcc_crc_err(const struct nrf_modem_dect_phy_pcc_crc_failure_event
 /* Physical Data Channel reception notification. */
 static void on_pdc(const struct nrf_modem_dect_phy_pdc_event *evt)
 {
-	/* Received RSSI value is in fixed precision format Q14.1 */
-	LOG_INF("Received data (RSSI: %d.%d): %s",
-		(evt->rssi_2 / 2), (evt->rssi_2 & 0b1) * 5, (char *)evt->data);
+	LOG_INF("Response received: %s",
+		 (char *)evt->data);
 }
 
 /* Physical Data Channel CRC error notification. */
@@ -255,6 +256,38 @@ static struct nrf_modem_dect_phy_config_params dect_phy_config_params = {
 	.harq_rx_expiry_time_us = 5000000,
 };
 
+
+/* Receive operation. */
+static int receive(uint32_t handle)
+{
+	int err;
+
+	struct nrf_modem_dect_phy_rx_params rx_op_params = {
+		.start_time = 0,
+		.handle = handle,
+		.network_id = CONFIG_NETWORK_ID,
+		.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS,
+		.rssi_interval = NRF_MODEM_DECT_PHY_RSSI_INTERVAL_OFF,
+		.link_id = NRF_MODEM_DECT_PHY_LINK_UNSPECIFIED,
+		.rssi_level = -60,
+		.carrier = CONFIG_CARRIER,
+		.duration = CONFIG_RX_PERIOD_S * MSEC_PER_SEC *
+			    NRF_MODEM_DECT_MODEM_TIME_TICK_RATE_KHZ,
+		.filter.short_network_id = CONFIG_NETWORK_ID & 0xff,
+		.filter.is_short_network_id_used = 1,
+		/* listen for everything (broadcast mode used) */
+		.filter.receiver_identity = 0,
+	};
+
+	err = nrf_modem_dect_phy_rx(&rx_op_params);
+	if (err != 0) {
+		return err;
+	}
+
+	return 0;
+}
+
+
 /* Send operation. */
 static int transmit(uint32_t handle, void *data, size_t data_len)
 {
@@ -293,13 +326,20 @@ static int transmit(uint32_t handle, void *data, size_t data_len)
 	return 0;
 }
 
+
+
+
+
+
 int main(void)
 {
 	int err;
 	uint32_t tx_handle = 0;
+	uint32_t rx_handle = 1;
 	uint32_t tx_counter_value = 0;
 	uint8_t tx_buf[DATA_LEN_MAX];
 	size_t tx_len;
+
 
 	LOG_INF("Dect NR+ PHY Transmitter started");
 
@@ -363,7 +403,9 @@ int main(void)
 
 		/** Transmitting message */
 		LOG_INF("Transmitting %d", tx_counter_value);
-		tx_len = sprintf(tx_buf, "Hello DECT! %d", tx_counter_value);
+		
+		tx_len = sprintf((char*)tx_buf, "Hello DECT!");
+		
 
 		err = transmit(tx_handle, tx_buf, tx_len);
 		if (err) {
@@ -381,6 +423,18 @@ int main(void)
 				CONFIG_TX_TRANSMISSIONS);
 			break;
 		}
+
+		/** wait for ACK message */
+
+		err = receive(rx_handle);
+		if (err) {
+			LOG_ERR("Reception failed, err %d", err);
+			return err;
+		}
+		//LOG_INF("Received ACK");
+
+		/* Wait for RX operation to complete. */
+		k_sem_take(&operation_sem, K_FOREVER);
 	}
 
 	LOG_INF("Shutting down");
