@@ -1,25 +1,32 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# Read the CSV file
 df = pd.read_csv("rssi_measurements_0.csv")
 
-fig, ax1 = plt.subplots(figsize=(10, 6))
+# Calculate the mean of RSSI and SNR
+mean_rssi = 0.5 * (df['rx_rssi_high_level'] + df['rx_rssi_low_level'])
+mean_snr = 0.5 * (df['rx_snr_high'] + df['rx_snr_low'])
 
-ax1.plot(df["Timestamp (ms)"], df["RSSI (dBm)"], color='tab:blue', marker='o', label='RSSI (dBm)')
-ax1.set_xlabel("Tiempo (ms)")
-ax1.set_ylabel("RSSI (dBm)", color='tab:blue')
-ax1.tick_params(axis='y', labelcolor='tab:blue')
-ax1.grid(True, linestyle='--', alpha=0.5)
+# Create a figure
+fig, ax = plt.subplots(figsize=(10, 6))
 
-ax2 = ax1.twinx()
-ax2.plot(df["Timestamp (ms)"], df["BER (%)"], color='tab:red', marker='s', label='BER (%)')
-ax2.set_ylabel("BER (%)", color='tab:red')
-ax2.tick_params(axis='y', labelcolor='tab:red')
+# Scatter plot of mean SNR vs mean RSSI
+ax.scatter(mean_rssi, mean_snr, color='blue', label='Mean', marker='o')
 
-lines1, labels1 = ax1.get_legend_handles_labels()
-lines2, labels2 = ax2.get_legend_handles_labels()
-ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
+# Set axis labels
+ax.set_xlabel("RSSI (dBm)")
+ax.set_ylabel("SNR (dB)")
 
-plt.title("RSSI vs BER")
+# Enable grid
+ax.grid(True, linestyle='--', alpha=0.5)
+
+# Add legend
+ax.legend(loc='upper left')
+
+# Add title
+plt.title("SNR vs RSSI (Scatter)")
+
+# Adjust layout and show plot
 plt.tight_layout()
 plt.show()

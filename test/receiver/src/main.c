@@ -14,27 +14,20 @@
 
 
 
-//LOG_MODULE_REGISTER(app);
+LOG_MODULE_REGISTER(app);
 
-#define DATA_LEN_MAX 32
-#define CSV_FILE "/fat/measurements.csv"
-
+#define DATA_LEN_MAX 128
 
 
 
 BUILD_ASSERT(CONFIG_CARRIER, "Carrier must be configured according to local regulations");
-
-#define DATA_LEN_MAX 32
-
-
-
-
 
 static bool exit1;
 static uint16_t device_id;
 static uint64_t modem_time;
 static int per = 0;
 static int packet_num = 0;
+	
 
 int calculate_per(int ber, int old_per, int packet_num) {
     int has_error = (ber > 0) ? 100 : 0; 
@@ -218,13 +211,15 @@ static void on_pdc(const struct nrf_modem_dect_phy_pdc_event *evt)
     ////LOG_INF("Received data (RSSI: %d dBm): %s", rssi_dbm, (char *)evt->data);
 	packet_num++;
     uint64_t ts = k_uptime_get();
-	
-	int ber = calculate_ber(evt->data, "Hello DECT!", sizeof("Hello DECT!"));
+	char buf[DATA_LEN_MAX];
+	sprintf(buf, "hello world ajsfjing ndcjdxsjxi93i294xi93i294");
+
+	int ber = calculate_ber(evt->data, buf, strlen(buf));
 	per = calculate_per(ber, per, packet_num);
  //   //LOG_INF("BER: %d%%, PER: %d%%", ber, per);
 
     /* Print CSV line to RTT */
-    printk("%llu,%d,%d,%d\n", (unsigned long long)ts, rssi_dbm, ber, per);
+    printk("%llu,%d,%d,%d,%s\n", (unsigned long long)ts, rssi_dbm, ber, per, (char*)evt->data);
 
     
 
@@ -414,11 +409,11 @@ int main(void)
 	int err;
 	uint32_t rx_handle = 1;
 	uint32_t tx_handle = 2;
-
+	
 	
 
 	//LOG_INF("Dect NR+ PHY Receiver started");
-	printk("Timestamp (ms),RSSI (dBm),BER (%%),PER (%%)\n");
+	printk("Timestamp (ms),RSSI (dBm),BER (%%),PER (%%), PAYLOAD\n");
 
 	err = nrf_modem_lib_init();
 	if (err) {

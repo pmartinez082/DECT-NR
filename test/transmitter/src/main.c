@@ -10,13 +10,13 @@
 #include <modem/nrf_modem_lib.h>
 #include <zephyr/drivers/hwinfo.h>
 
-#define PREAMBLE_LEN 4
+
 
 LOG_MODULE_REGISTER(app);
 
 BUILD_ASSERT(CONFIG_CARRIER, "Carrier must be configured according to local regulations");
 
-#define DATA_LEN_MAX 32
+#define DATA_LEN_MAX 128
 
 static bool exit;
 static uint16_t device_id;
@@ -403,8 +403,9 @@ int main(void)
 
 		/** Transmitting message */
 		LOG_INF("Transmitting %d", tx_counter_value);
-		
-		tx_len = sprintf((char*)tx_buf, "Hello DECT!");
+	
+		 
+		tx_len = sprintf((char*)tx_buf,"hello world ajsfjing ndcjdxsjxi93i294xi93i294" );
 		
 
 		err = transmit(tx_handle, tx_buf, tx_len);
