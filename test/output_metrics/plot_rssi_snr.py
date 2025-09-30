@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the CSV file
-df = pd.read_csv("rssi_measurements_0.csv")
+df = pd.read_csv("rssi_measurements_1.csv")
 
 # Calculate the mean of RSSI and SNR
 mean_rssi = 0.5 * (df['rx_rssi_high_level'] + df['rx_rssi_low_level'])
