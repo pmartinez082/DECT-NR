@@ -15,6 +15,7 @@ ax2 = ax1.twinx()
 ax2.plot(df["Timestamp (ms)"], df["BER (%)"], color='tab:red', marker='s', label='BER (%)')
 ax2.set_ylabel("BER (%)", color='tab:red')
 ax2.tick_params(axis='y', labelcolor='tab:red')
+ax2.set_ylim(0, 100)  # Limit BER axis from 0 to 100%
 
 lines1, labels1 = ax1.get_legend_handles_labels()
 lines2, labels2 = ax2.get_legend_handles_labels()
