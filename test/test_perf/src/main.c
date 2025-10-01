@@ -244,15 +244,29 @@ int main(void)
 		printk("rx_id,rx_testing_mcs,rx_rssi_low_level,rx_rssi_high_level,rx_phy_transmit_pwr_low,"
 		       "rx_phy_transmit_pwr_high,rx_snr_low,rx_snr_high\n");
 	
-
+	int p_tx = 0;
+	int count = 0; 
 	while (true) {
 		if (g_role == 0) {
+			
 		//	printk("Running as CLIENT\n");
+			
 			shell_execute_cmd(desh_shell, "dect perf -s -t 15 --channel 1671");
 			k_sleep(K_SECONDS(20));
 			shell_execute_cmd(desh_shell, "dect perf stop");
 			k_sleep(K_SECONDS(5));
 		} else if (g_role == 1) {
+			count++;
+			char buf[32];
+			sprintf(buf, "dect sett --tx_pwr %d", p_tx);
+			shell_execute_cmd(desh_shell, buf);
+			if (count  == 5){
+			p_tx--;
+			count = 0;
+			}
+			if (p_tx < -19) {
+				p_tx = 0;
+			}
 			printk("Running as SERVER\n");
 			shell_execute_cmd(desh_shell, "dect perf -c --c_gap_subslots 3 --c_tx_mcs 4 --c_slots 4 "
 						  "--s_tx_id 39 -t 15 --channel 1671");
