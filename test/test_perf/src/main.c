@@ -172,21 +172,21 @@ static void desh_print_reset_reason(void)
 static int cmd_role(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc < 2) {
-		printk(sh, "Usage: role <0=client | 1=server>");
+		desh_print("Usage: role <0=server | 1=client>");
 		return -EINVAL;
 	}
 
 	int val = atoi(argv[1]);
 	if (val != 0 && val != 1) {
-		printk(sh, "Invalid value, use 0=client or 1=server");
+		desh_print("Invalid value, use 0=client or 1=server");
 		return -EINVAL;
 	}
 
 	g_role = val;
-	printk(sh, "Role set: %s", g_role == 0 ? "CLIENT" : "SERVER");
+	desh_print("Role set: %s", g_role == 1 ? "CLIENT" : "SERVER");
 	return 0;
 }
-SHELL_CMD_REGISTER(role, NULL, "Select role (0=client,1=server)", cmd_role);
+SHELL_CMD_REGISTER(role, NULL, "Select role (0=SERVER,1=CLIENT)", cmd_role);
 
 
 
@@ -234,30 +234,27 @@ int main(void)
 
 	/* Resize terminal width and height of the shell to have proper command editing. */
 	shell_execute_cmd(desh_shell, "resize");
-
-	desh_print_version_info();
+desh_print_version_info();
 
 		printk("Executing perf\nSelect role (0 = client, 1 = server): \n");
 
 
-
-		printk("rx_id,rx_testing_mcs,rx_rssi_low_level,rx_rssi_high_level,rx_phy_transmit_pwr_low,"
-		       "rx_phy_transmit_pwr_high,rx_snr_low,rx_snr_high\n");
-	
 	int p_tx = 0;
 	int count = 0; 
+	int mcs = 3;
 	while (true) {
 		if (g_role == 0) {
 			
-		//	printk("Running as CLIENT\n");
 			
-			shell_execute_cmd(desh_shell, "dect perf -s -t 15 --channel 1671");
+			shell_execute_cmd(desh_shell, "dect sett -t 39");
+			shell_execute_cmd(desh_shell, "dect perf -s -t -1 -a --s_harq_feedback_tx_delay_subslots 2 --s_harq_feedback_tx_rx_delay_subslots 3 --channel 1671");
 			k_sleep(K_SECONDS(20));
-			shell_execute_cmd(desh_shell, "dect perf stop");
-			k_sleep(K_SECONDS(5));
-		} else if (g_role == 1) {
+
+				} else if (g_role == 1) {
 			count++;
-			char buf[32];
+			char buf[32] = {0};
+			char buf2[256] = {0};
+			sprintf(buf2, "dect perf -c --c_gap_subslots 4 --c_tx_mcs %d --c_slots 4 --s_tx_id 39 -t 12 --c_harq_feedback_rx_delay_subslots 2 --c_harq_feedback_rx_subslots 3 --c_harq_process_nbr_max 7 -a --channel 1671", mcs);
 			sprintf(buf, "dect sett --tx_pwr %d", p_tx);
 			shell_execute_cmd(desh_shell, buf);
 			if (count  == 5){
@@ -266,12 +263,13 @@ int main(void)
 			}
 			if (p_tx < -19) {
 				p_tx = 0;
+				mcs++;
 			}
-			printk("Running as SERVER\n");
-			shell_execute_cmd(desh_shell, "dect perf -c --c_gap_subslots 3 --c_tx_mcs 4 --c_slots 4 "
-						  "--s_tx_id 39 -t 15 --channel 1671");
+			if(mcs >8)
+				mcs = 2;
+
+			shell_execute_cmd(desh_shell, buf2);
 			k_sleep(K_SECONDS(20));
-			shell_execute_cmd(desh_shell, "dect perf stop");
 			k_sleep(K_SECONDS(5));
 		} else {
 			/* No role selected yet, wait and check again */
@@ -280,11 +278,3 @@ int main(void)
 	}
 }
 	
-
-
-
-	
-
-
-
-

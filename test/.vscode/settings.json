@@ -1,6 +1,11 @@
 {
     "nrf-connect.applications": [
         "${workspaceFolder}\\transmitter",
-        "${workspaceFolder}\\receiver"
-    ]
+        "${workspaceFolder}\\receiver",
+        "${workspaceFolder}\\test_perf"
+    ],
+    "files.associations": {
+        "*.dbclient-js": "javascript",
+        "nrf_modem_dect_phy.h": "c"
+    }
 }

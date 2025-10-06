@@ -1052,6 +1052,7 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 
 	int64_t time_orig_started = perf_data.time_started_ms;
 	int64_t elapsed_time_ms = k_uptime_delta(&time_orig_started);
+	char results_str_csv[256];
 	int ret = 0;
 
 	if (elapsed_time_ms_ptr != NULL) {
@@ -1060,7 +1061,7 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 
 	double perf = dect_phy_perf_calculate_throughput(perf_data.tx_metrics.tx_total_data_amount,
 							 elapsed_time_ms);
-
+	/*
 	desh_print("perf tx operation completed:");
 	desh_print("  total amount of data sent: %d bytes", perf_data.tx_metrics.tx_total_data_amount);
 	desh_print("  packet count:              %d", perf_data.tx_metrics.tx_total_pkt_count);
@@ -1088,6 +1089,40 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 			   perf_data.rx_metrics.rx_phy_transmit_pwr_low,
 			   perf_data.rx_metrics.rx_phy_transmit_pwr_high);
 	}
+*/
+	// CSV format for easier import
+	/*header for reference:
+	"tx_id, mcs, rssi_min, rssi_max, pwr_min, pwr_max, snr_min, snr_max,
+	data_amount_bytes, pkt_count, elapsed_time_secs, data_rate_kbps,
+	pdc_crc_err_count, pcc_crc_err_count, harq_nack_count, harq_ack_count, harq_timeout_count,
+	out_of_seq_count, restarted_count"
+	*/
+	memset(results_str_csv, 0, sizeof(results_str_csv));
+	sprintf(results_str_csv + strlen(results_str_csv), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%.2f,%d,%d,%d,%d,%d\n",
+		perf_data.rx_metrics.rx_last_tx_id,
+		perf_data.rx_metrics.rx_testing_mcs,
+		perf_data.rx_metrics.rx_rssi_low_level,
+		perf_data.rx_metrics.rx_rssi_high_level,
+		dect_common_utils_phy_tx_power_to_dbm(perf_data.rx_metrics.rx_phy_transmit_pwr_low),
+		dect_common_utils_phy_tx_power_to_dbm(perf_data.rx_metrics.rx_phy_transmit_pwr_high),
+		perf_data.rx_metrics.rx_snr_low,
+		perf_data.rx_metrics.rx_snr_high,
+		perf_data.rx_metrics.rx_total_data_amount,
+		perf_data.rx_metrics.rx_total_pkt_count,
+		
+		(int)elapsed_time_ms / 1000,
+		(float)perf/1000,
+		perf_data.rx_metrics.rx_pdc_crc_error_count,
+		perf_data.rx_metrics.rx_pcc_crc_error_count,
+		perf_data.rx_metrics.harq_nack_rx_count,
+		perf_data.rx_metrics.harq_ack_rx_count,
+		(int)perf_data.tx_metrics.tx_harq_timeout_count,
+
+		
+		perf_data.rx_metrics.rx_out_of_seq_count,
+		(int)perf_data.rx_metrics.rx_restarted_count);
+		
+		desh_print("%s", results_str_csv);
 
 	ret = dect_phy_perf_tx_request_results();
 	if (ret) {
@@ -1096,7 +1131,7 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 		dect_phy_perf_cmd_done();
 	} else {
 		perf_data.client_data.tx_results_from_server_requested = true;
-		desh_print("Requested results from the server...");
+		//desh_print("Requested results from the server...");
 	}
 	return ret;
 }
@@ -1223,8 +1258,8 @@ static void dect_phy_perf_server_report_local_and_tx_results(void)
 */
 	/* CSV format for easier import*/
 	memset(results_str_csv, 0, sizeof(results_str_csv));
-	//sprintf(results_str_csv, "rx_id,rx_testing_mcs,rx_rssi_low_level,rx_rssi_high_level,rx_phy_transmit_pwr_low,rx_phy_transmit_pwr_high,rx_snr_low,rx_snr_high\n");
-	sprintf(results_str_csv + strlen(results_str_csv), "%d,%d,%d,%d,%d,%d,%d,%d\n",
+	//sprintf(results_str_csv, "rx_id,rx_testing_mcs,rx_rssi_low_level,rx_rssi_high_level,rx_phy_transmit_pwr_low,rx_phy_transmit_pwr_high,rx_snr_low,rx_snr_high, HARQ_feedback_tx_bytes, total_data, packet_count, elapsed_time, data_rate, pcc_crc_error_count, pdc_crc_error_count, out_of_seqs, restarted_count \n");
+	sprintf(results_str_csv + strlen(results_str_csv), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		perf_data.rx_metrics.rx_last_tx_id,
 		perf_data.rx_metrics.rx_testing_mcs,
 		perf_data.rx_metrics.rx_rssi_low_level,
@@ -1232,8 +1267,17 @@ static void dect_phy_perf_server_report_local_and_tx_results(void)
 		dect_common_utils_phy_tx_power_to_dbm(perf_data.rx_metrics.rx_phy_transmit_pwr_low),
 		dect_common_utils_phy_tx_power_to_dbm(perf_data.rx_metrics.rx_phy_transmit_pwr_high),
 		perf_data.rx_metrics.rx_snr_low,
-		perf_data.rx_metrics.rx_snr_high);
+		perf_data.rx_metrics.rx_snr_high,
+		perf_data.rx_metrics.rx_total_data_amount,
+		perf_data.rx_metrics.rx_total_pkt_count,
+		(int)elapsed_time_ms / 1000,
+		(int)perf/1000,
+		perf_data.rx_metrics.rx_pdc_crc_error_count,
+		perf_data.rx_metrics.rx_out_of_seq_count,
+		(int)perf_data.rx_metrics.rx_restarted_count)
+		;
 	
+
 	//desh_print("server: sending result response of total length: %d:\n\"%s\"\n",
 	//	   (strlen(results_str) + 1), results_str);
 
@@ -1338,9 +1382,9 @@ void dect_phy_perf_mdm_op_completed(
 							perf_data.cmd_params;
 
 						copy_params.duration_secs = secs_left;
-						desh_print("Server RX completed but duration left: "
+						/*desh_print("Server RX completed but duration left: "
 							   "restarting (%d secs).",
-							   secs_left);
+							   secs_left);*/
 						dect_phy_perf_start(&copy_params, RESTART);
 					}
 				}
@@ -1358,21 +1402,21 @@ void dect_phy_perf_mdm_op_completed(
 					copy_params.duration_secs = secs_left;
 					dect_phy_perf_start(&copy_params, RESTART);
 				} else {
-					desh_error(
+					/*desh_error(
 						"perf server RX failed - perf server RX stopped.");
-					dect_phy_perf_cmd_done();
+					dect_phy_perf_cmd_done();*/
 				}
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PERF_RESULTS_REQ_TX_HANDLE) {
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-				desh_print("RESULT_REQ sent.");
+				//desh_print("RESULT_REQ sent.");
 			} else {
 				desh_warn("RESULT_REQ sending failed.");
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PERF_RESULTS_RESP_TX_HANDLE) {
 			perf_data.server_data.rx_results_sent = false;
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-				desh_print("RESULT_RESP sent.");
+				//desh_print("RESULT_RESP sent.");
 			} else {
 				desh_warn("RESULT_RESP sending failed.");
 			}
@@ -1382,12 +1426,12 @@ void dect_phy_perf_mdm_op_completed(
 			if (secs_left) {
 				/* Continue as server */
 				if (secs_left == DECT_PHY_PERF_DURATION_INFINITE) {
-					desh_print("Server RX will be continued after result TX is "
-						   "done.");
+				/*	desh_print("Server RX will be continued after result TX is "
+						   "done.");*/
 				} else {
-					desh_print("Server RX will be continued (%d secs) after "
+				/*	desh_print("Server RX will be continued (%d secs) after "
 						   "result TX is done.",
-						   secs_left);
+						   secs_left);*/
 				}
 				if (perf_data.cmd_params.duration_secs) {
 					struct dect_phy_perf_params copy_params =
@@ -1404,7 +1448,7 @@ void dect_phy_perf_mdm_op_completed(
 		} else if (mdm_completed_params->handle == DECT_PHY_PERF_RESULTS_RESP_RX_HANDLE) {
 			/* Client */
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-				desh_print("RX for perf results done.");
+			//	desh_print("RX for perf results done.");
 			} else {
 				desh_print("RX for perf results failed.");
 			}
@@ -1492,9 +1536,9 @@ static void dect_phy_perf_thread_fn(void)
 				    params->handle == DECT_PHY_PERF_RESULTS_REQ_TX_HANDLE ||
 				    params->handle == DECT_PHY_PERF_RESULTS_RESP_TX_HANDLE ||
 				    params->handle == DECT_PHY_PERF_RESULTS_RESP_RX_HANDLE) {
-					desh_warn("%s: perf modem operation failed: %s, "
+					/*desh_warn("%s: perf modem operation failed: %s, "
 						  "handle %d",
-						  __func__, tmp_str, params->handle);
+						  __func__, tmp_str, params->handle);*/
 					dect_phy_perf_mdm_op_completed(params);
 				} else if (params->handle == DECT_HARQ_FEEDBACK_TX_HANDLE) {
 					desh_error("%s: cannot TX HARQ feedback: %s", __func__,
@@ -1923,7 +1967,7 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
 		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
-			desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);
+			//desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);
 			dect_phy_perf_msgq_non_data_op_add(DECT_PHY_PERF_EVENT_SERVER_REPORT);
 		} else if (pdu.header.transmitter_id ==
 				perf_data.rx_metrics.rx_last_tx_id_from_pcc) {
@@ -1944,7 +1988,7 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 				  pdu.header.transmitter_id, perf_data.rx_metrics.rx_last_tx_id);
 		}
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_RESP) {
-		desh_print("Server results received:");
+	//	desh_print("Server results received:");
 		desh_print("%s", pdu.message.results.results_str);
 	} else {
 		desh_warn("type %d", pdu.header.message_type);

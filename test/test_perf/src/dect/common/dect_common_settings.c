@@ -84,7 +84,7 @@ int dect_common_settings_write(struct dect_phy_settings *dect_common_sett)
 
 	/* Short RD ID is generated at boot but we store it in settings */
 	phy_settings_data.common.short_rd_id = orig_short_rd_id;
-	desh_print("dect common settings saved");
+	//desh_print("dect common settings saved");
 
 	return ret;
 }
