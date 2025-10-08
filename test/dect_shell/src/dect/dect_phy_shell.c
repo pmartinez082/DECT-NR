@@ -196,7 +196,7 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	optind = 1;
 
 	if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
-		//desh_print("Perf command stopping.");
+		desh_print("Perf command stopping.");
 		dect_phy_ctrl_perf_cmd_stop();
 		return 0;
 	}

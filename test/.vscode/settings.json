@@ -2,7 +2,8 @@
     "nrf-connect.applications": [
         "${workspaceFolder}\\transmitter",
         "${workspaceFolder}\\receiver",
-        "${workspaceFolder}\\test_perf"
+        "${workspaceFolder}\\test_perf",
+        "${workspaceFolder}\\dect_shell"
     ],
     "files.associations": {
         "*.dbclient-js": "javascript",

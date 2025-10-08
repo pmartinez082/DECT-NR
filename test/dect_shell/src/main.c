@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/init.h>
@@ -46,7 +47,10 @@ struct k_work_q desh_common_work_q;
 /* Global variables */
 const struct shell *desh_shell;
 
-static int g_role = -1;  
+static char g_role = '\0';  
+static char buf[32];
+static char buf2[300];
+static char buf3[32];
 
 
 char desh_at_resp_buf[DESH_AT_CMD_RESPONSE_MAX_LEN];
@@ -176,14 +180,14 @@ static int cmd_role(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	int val = atoi(argv[1]);
-	if (val != 0 && val != 1) {
-		desh_print("Invalid value, use 0=client or 1=server");
+	char val = argv[1][0];
+	if (val != '0' && val != '1') {
+		desh_print("Invalid value, use 0=server or 1=client");
 		return -EINVAL;
 	}
 
 	g_role = val;
-	desh_print("Role set: %s", g_role == 1 ? "CLIENT" : "SERVER");
+	desh_print("Role set: %s", g_role == '1' ? "CLIENT" : "SERVER");
 	return 0;
 }
 SHELL_CMD_REGISTER(role, NULL, "Select role (0=SERVER,1=CLIENT)", cmd_role);
@@ -236,27 +240,36 @@ int main(void)
 	shell_execute_cmd(desh_shell, "resize");
 desh_print_version_info();
 
-		printk("Executing perf\nSelect role (0 = client, 1 = server): \n");
+		printk("Executing perf\nSelect role (1 = client, 0 = server): \n");
 
-
+	
 	int p_tx = 0;
 	int count = 0; 
 	int mcs = 3;
 	while (true) {
-		if (g_role == 0) {
 			
-			
-			shell_execute_cmd(desh_shell, "dect sett -t 39");
-			shell_execute_cmd(desh_shell, "dect perf -s -t -1 -a --s_harq_feedback_tx_delay_subslots 2 --s_harq_feedback_tx_rx_delay_subslots 3 --channel 1671");
-			k_sleep(K_SECONDS(20));
 
-				} else if (g_role == 1) {
-			count++;
-			char buf[32] = {0};
-			char buf2[256] = {0};
-			sprintf(buf2, "dect perf -c --c_gap_subslots 4 --c_tx_mcs %d --c_slots 4 --s_tx_id 39 -t 12 --c_harq_feedback_rx_delay_subslots 2 --c_harq_feedback_rx_subslots 3 --c_harq_process_nbr_max 7 -a --channel 1671", mcs);
-			sprintf(buf, "dect sett --tx_pwr %d", p_tx);
+		if (g_role == '0') {
+			
+			
+			shell_execute_cmd(desh_shell, "dect sett -t 1");
+			shell_execute_cmd(desh_shell, "dect perf -s -t 1200 -a --s_harq_feedback_tx_delay_subslots 2 --s_harq_feedback_tx_rx_delay_subslots 3 --channel 1671");
+			k_sleep(K_FOREVER);
+
+			} else if (g_role == '1') {
+			
+			snprintf(buf2, sizeof(buf2), "dect perf -c --c_gap_subslots 4 --c_tx_mcs %d --c_slots 4 --s_tx_id 1 -t 10 --c_harq_feedback_rx_delay_subslots 2 --c_harq_feedback_rx_subslots 3 --c_harq_process_nbr_max 7 -a --channel 1671", mcs);
+			snprintf(buf,sizeof(buf), "dect sett --tx_pwr %d", p_tx);
+
+			shell_execute_cmd(desh_shell, buf3);
+			k_sleep(K_MSEC(300));
+			//desh_print("Executing power selection\n");
 			shell_execute_cmd(desh_shell, buf);
+			//desh_print("Executing perf with MCS %d and TX power %d\n", mcs, p_tx);
+			k_sleep(K_MSEC(300));
+			shell_execute_cmd(desh_shell, buf2);
+
+			count++;
 			if (count  == 5){
 			p_tx--;
 			count = 0;
@@ -265,16 +278,17 @@ desh_print_version_info();
 				p_tx = 0;
 				mcs++;
 			}
-			if(mcs >8)
-				mcs = 2;
+			if(mcs >8){
+				mcs = 3;
+			}
 
-			shell_execute_cmd(desh_shell, buf2);
-			k_sleep(K_SECONDS(20));
-			k_sleep(K_SECONDS(5));
+			k_sleep(K_SECONDS(19));
+		
 		} else {
 			/* No role selected yet, wait and check again */
 			k_sleep(K_SECONDS(1));
 		}
+		
 	}
 }
 	

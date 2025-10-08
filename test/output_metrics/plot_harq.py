@@ -3,23 +3,37 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap, BoundaryNorm
 # Read the CSV file
-df = pd.read_csv("csv_files/20251006_measurements_HARQ_mcs_3&4.csv")
+#dfServer = pd.read_csv("csv_files/20251007_measurements_HARQ_server.csv")
+dfClient = pd.read_csv(
+    "csv_files/20251007_measurements_HARQ_client.csv",
+    sep=",",          # your CSV uses commas
+    index_col=False,  # do not use first column as index
+    engine="python",  # more flexible parser
+    skipinitialspace=True,
+    quotechar='"',
+    on_bad_lines="skip"
+)
+
+print(dfClient.head(5))
+print(dfClient.columns)
+
 df_noHARQ = pd.read_csv("csv_files/20251002_measurements_noHARQ_mcs_3&4.csv")
 
+print(dfClient.dtypes)
+print(dfClient.columns.tolist())
+print(dfClient[["pdc_crc_err_cnt", "packet_count", "throughput_kbps"]].head(20))
+print(dfClient[["pdc_crc_err_cnt", "packet_count"]].dtypes)
 
 
 # HARQ 
-df_tx = df["tx_id"] == 0
-df_rx = df["tx_id"] != 0
-df_rx = df[df_rx]
-print(df_rx)
-error_rate = df_rx["pdc_crc_err_cnt"] / df_rx["total_data_pkts"]
-througput = df_rx["data_rate_kbps"] / 1e3  # Convert to Mbps
+error_rate = dfClient["pdc_crc_err_cnt"] / dfClient["packet_count"]
+througput = dfClient["throughput_kbps"] 
 
+print(error_rate)
 
 # NoHARQ data
 error_rate_noHARQ = df_noHARQ["pdc_crc_err_cnt"] / df_noHARQ["packet_count"]
-througput_noHARQ = df_noHARQ["data_rate"] / 1e3  # Convert to Mbps
+througput_noHARQ = df_noHARQ["data_rate"] 
 
 
 fig, ax = plt.subplots(figsize=(10, 6))
@@ -30,30 +44,26 @@ scatter = ax.scatter(
     error_rate,
     througput,
     
-    cmap=cmap,
-    norm=norm,            
+              
     marker='o',
     s=60,
     edgecolor='k',
     alpha=0.8
 )
-
+"""
 scatter_noHARQ = ax.scatter(
     error_rate_noHARQ,
     througput_noHARQ,
    
-    cmap=cmap,
-    norm=norm,            
+               
     marker='o',
     s=60,
     edgecolor='k',
     alpha=0.8
 )
-
-cbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(3, 6, 1))
-cbar.set_label("MCS")
+"""
 ax.set_xlabel("Error rate")
-ax.set_ylabel("Throughput (Mbps)")
+ax.set_ylabel("Throughput (Kbps)")
 ax.legend(loc='upper left')
 plt.title("Error rate vs throughput")
 plt.tight_layout()

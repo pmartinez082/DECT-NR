@@ -1,25 +1,42 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from datetime import datetime
 
 df = pd.read_csv("rssi_measurements_0.csv")
 
-fig, ax1 = plt.subplots(figsize=(10, 6))
+fig, ax = plt.subplots(figsize=(10, 6))
 
-ax1.plot(df["Timestamp (ms)"], df["RSSI (dBm)"], color='tab:blue', marker='o', label='RSSI (dBm)')
-ax1.set_xlabel("Tiempo (ms)")
-ax1.set_ylabel("RSSI (dBm)", color='tab:blue')
-ax1.tick_params(axis='y', labelcolor='tab:blue')
-ax1.grid(True, linestyle='--', alpha=0.5)
+cmap = plt.get_cmap('viridis', 4)  
+norm = BoundaryNorm(np.arange(2.5, 5.5, 1), cmap.N)  
 
-ax2 = ax1.twinx()
-ax2.plot(df["Timestamp (ms)"], df["BER (%)"], color='tab:red', marker='s', label='BER (%)')
-ax2.set_ylabel("BER (%)", color='tab:red')
-ax2.tick_params(axis='y', labelcolor='tab:red')
-ax2.set_ylim(0, 100) 
-lines1, labels1 = ax1.get_legend_handles_labels()
-lines2, labels2 = ax2.get_legend_handles_labels()
-ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper right')
 
-plt.title("RSSI vs BER")
-plt.tight_layout()
+scatter = ax.scatter(
+    df["throuhput"],
+    df["PER"],
+    c=df["rx_testing_mcs"],
+    cmap=cmap,
+    norm=norm,            
+    marker='o',
+    s=60,
+    edgecolor='k',
+    alpha=0.8
+)
+
+# Colorbar with integer ticks
+cbar = plt.colorbar(scatter, ax=ax, ticks=np.arange(3, 6, 1))
+cbar.set_label("MCS")
+
+# Set axis labels
+ax.set_xlabel("Throughput (kbps)")
+ax.set_ylabel("PER (%)")
+ax.set_title("Throughput vs PER")
+ax.set_ylim(0, 100)
+
+# Enable grid
+ax.grid(True, linestyle='--', alpha=0.5)
+
+# Save plot
+plt.savefig("output/"+datetime.now().strftime("%Y%m%d")+"_throughput_vs_PER.pdf", format="pdf")
 plt.show()

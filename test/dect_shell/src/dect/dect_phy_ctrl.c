@@ -1520,7 +1520,7 @@ static bool dect_phy_ctrl_op_ongoing(void)
 		return true;
 	}
 	if (ctrl_data.perf_ongoing) {
-	//	desh_warn("Performance test ongoing.");
+		desh_warn("Performance test ongoing.");
 		return true;
 	}
 	if (ctrl_data.ping_ongoing) {
@@ -1543,7 +1543,8 @@ int dect_phy_ctrl_perf_cmd(struct dect_phy_perf_params *params)
 	int ret;
 
 	if (dect_phy_ctrl_op_ongoing()) {
-		//desh_error(	"DECT operation already on going. Stop all before starting running perf.");
+		desh_error(
+			"DECT operation already on going. Stop all before starting running perf.");
 		return -EBUSY;
 	}
 	dect_phy_ctrl_mdm_op_cancel_all();

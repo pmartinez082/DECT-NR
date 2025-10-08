@@ -10,7 +10,7 @@ menu "Nordic Dect NR+ Phy Shell config"
 
 config DESH_PRINT_BUFFER_SIZE
 	int "Buffer size used when printing shell output"
-	default 1024
+	default 2048
 	help
 	  If the printed string exceeds this buffer, an error message is printed first and
 	  then the requested string cut into the length of this buffer.
