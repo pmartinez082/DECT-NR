@@ -58,6 +58,14 @@ struct dect_phy_common_op_pdc_crc_fail_params {
 	struct nrf_modem_dect_phy_pdc_crc_failure_event crc_failure;
 };
 
+struct dect_phy_perf_ber_calc_params {
+	uint32_t total_packets;
+	uint32_t error_packets;
+	float ber;
+	float per;
+
+};
+
 struct dect_phy_commmon_op_pdc_rcv_params {
 	struct nrf_modem_dect_phy_pdc_event rx_status;
 
@@ -94,6 +102,10 @@ struct dect_phy_data_rcv_common_params {
 	int16_t rx_rssi_dbm;
 	int16_t rx_pwr_dbm;
 	uint16_t data_length;
+
+	uint8_t pcc_crc_error;
+	uint8_t pdc_crc_error;
+	
 	void *data;
 };
 

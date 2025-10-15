@@ -1861,7 +1861,7 @@ show_usage:
 
 static int server_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
 {
-    printk("tx_id,total_data,total_pkts,elapsed_s,throughput_kbps,restarts,tx_data,pcc_err,pdc_err,out_of_seq,mcs,rssi_low,rssi_high,tx_pwr_low,tx_pwr_high,snr_low,snr_high,PER,BER,err_pkts\n");
+    printk("tx_id,total_data,total_pkts,elapsed_s,throughput_kbps,pcc_err,pdc_err,out_of_seq,mcs,rssi_low,rssi_high,tx_pwr_low,tx_pwr_high,snr_low,snr_high,PER,BER,error_pkts\n");
 
     /* Configure TX type (disable HARQ) */
     const char *sett_args[] = {
@@ -1881,7 +1881,7 @@ static int server_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
     };
 	
     dect_phy_perf_cmd(sh, ARRAY_SIZE(perf_args), (char **)perf_args);
-	k_sleep(K_SECONDS(10));
+	k_sleep(K_SECONDS(35));
 	}
    
 
@@ -1899,7 +1899,8 @@ static int client_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
     int count = 0;
     char tx_pwr_str[8];
     char mcs_str[8];
-    
+      k_sleep(K_MSEC(300));
+
     while (true) {
         /* Set TX power */
         snprintf(tx_pwr_str, sizeof(tx_pwr_str), "%d", p_tx);
@@ -1909,8 +1910,7 @@ static int client_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
         };
         dect_phy_sett_cmd(sh, ARRAY_SIZE(sett_args), (char **)sett_args);
 
-        k_sleep(K_MSEC(300));
-
+      
         /* Run performance test (client mode) */
         snprintf(mcs_str, sizeof(mcs_str), "%d", mcs);
         const char *perf_args[] = {
@@ -1920,7 +1920,7 @@ static int client_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
             "--c_tx_mcs", mcs_str,
             "--c_slots", "4",
             "--s_tx_id", "1",
-            "-t", "10",
+            "-t", "20",
             "--channel", "1671"
         };
         dect_phy_perf_cmd(sh, ARRAY_SIZE(perf_args), (char **)perf_args);
@@ -1942,7 +1942,7 @@ static int client_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
         }
 
         /* Sleep between tests */
-        k_sleep(K_SECONDS(20));
+        k_sleep(K_SECONDS(35));
     }
 
     return 0;
