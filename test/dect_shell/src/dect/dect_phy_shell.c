@@ -1891,61 +1891,48 @@ static int server_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
 
 static int client_perf_no_HARQ(const struct shell *sh, size_t argc, char **argv)
 {
-    printk("tx_total_pkt_count,elapsed_time_s,throughput_kbps\n");
+    
  
 
-    int p_tx = -40;
-    int mcs = 4;
-    int count = 0;
-    char tx_pwr_str[8];
-    char mcs_str[8];
-      k_sleep(K_MSEC(300));
+	/* Debug: print argc and argv to see what the shell passes */
 
-    while (true) {
-        /* Set TX power */
-        snprintf(tx_pwr_str, sizeof(tx_pwr_str), "%d", p_tx);
-        const char *sett_args[] = {
-            "sett_cmd_dummy",   /* dummy argv[0] */
-            "--tx_pwr", tx_pwr_str
-        };
-        dect_phy_sett_cmd(sh, ARRAY_SIZE(sett_args), (char **)sett_args);
 
-      
-        /* Run performance test (client mode) */
-        snprintf(mcs_str, sizeof(mcs_str), "%d", mcs);
-        const char *perf_args[] = {
-            "perf_cmd_dummy",   /* dummy argv[0] */
-            "-c",
-            "--c_gap_subslots", "3",
-            "--c_tx_mcs", mcs_str,
-            "--c_slots", "4",
-            "--s_tx_id", "1",
-            "-t", "20",
-            "--channel", "1671"
-        };
-        dect_phy_perf_cmd(sh, ARRAY_SIZE(perf_args), (char **)perf_args);
+	k_sleep(K_MSEC(300));
 
-        /* Update counters */
-        count++;
-        if (count == 5) {
-            p_tx++;
-            count = 0;
-        }
+	if (argc >= 2 && argv[1] != NULL && argv[1][0] >= '0' && argv[1][0] <= '4' && argv[1][1] == '\0') {
+		/* Convert single digit character to numeric mcs value (e.g. '0' -> 0) */
+		int mcs = argv[1][0] - '0';
+		
+		
+		const char *perf_args[] = {
+			"perf_cmd_dummy",
+			"-c",
+			"--c_tx_pwr", "-40",
+			"--c_tx_mcs", NULL,
+			"--c_slots", "2",
+			"--s_tx_id", "1",
+			"-t", "20",
+			"--channel", "1671"
+		};
 
-        if (p_tx > 0) {
-            p_tx = -40;
-            mcs--;
-        }
+		char mcs_str[4];
+		snprintf(mcs_str, sizeof(mcs_str), "%d", mcs);
+	/* insert mcs string into args (NULL placeholder is at index 5) */
+	((char **)perf_args)[5] = mcs_str;
 
-        if (mcs == 0 && p_tx == 0) {
-            break; /* End sweep */
-        }
+		
+	
+		printk("Client: You chose mcs = %d\n", mcs);
+		printk("tx_total_pkt_count,elapsed_time_s,throughput_kbps\n");
+	// Loop
+	while (1) {
+			dect_phy_perf_cmd(sh, ARRAY_SIZE(perf_args), (char **)perf_args);
+			k_sleep(K_SECONDS(35));
 
-        /* Sleep between tests */
-        k_sleep(K_SECONDS(35));
-    }
-
-    return 0;
+	}
+	}
+	
+	return 0;
 }
 
 /**************************************************************************************************/
@@ -2018,5 +2005,5 @@ SHELL_SUBCMD_ADD((dect), server, NULL,
 SHELL_SUBCMD_ADD((dect), client, NULL,
 		 "dect perf periodic client command with no HARQ.\n"
 		 " Usage: dect client",
-		 client_perf_no_HARQ, 1, 0);
+		 client_perf_no_HARQ, 1, 2);
 

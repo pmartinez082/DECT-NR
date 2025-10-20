@@ -949,8 +949,8 @@ static int dect_phy_perf_start(struct dect_phy_perf_params *params,
 
 			
 			
-			perf_data.last_packet_ber = 0;
-			perf_data.per = 0;
+			perf_data.last_packet_ber = 1;
+			perf_data.per = 1;
 	}
 
 	perf_data.perf_ongoing = true;
@@ -1934,33 +1934,27 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
     }
 
     /* ============================================================
- * BER / PER CALCULATION SECTION (integrates CRC errors)
+ * BER / PER CALCULATION SECTION
  * ============================================================ */
 if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_TX_DATA) {
 
     const uint8_t *rx_payload = pdu.message.tx_data.pdu_payload;
     int len_bytes = pdu.message.tx_data.payload_length;
 
-    uint32_t ber = 0;
+    uint32_t ber = 1;
 
-    // Check if packet had CRC errors
-    bool crc_failed = (perf_data.rx_metrics.rx_pdc_crc_error_count > 0) ||
-                      (perf_data.rx_metrics.rx_pcc_crc_error_count > 0);
+    
 
-    if (crc_failed) {
-        // Treat as 100% BER
-        ber = 10000; // hundredths of percent
-        perf_data.error_packets++;
-    } else {
+     
         // Calculate bit errors normally for CRC-passed packets
         uint8_t expected_payload[DECT_PHY_PERF_TX_DATA_PDU_PAYLOAD_MAX_LEN];
         dect_common_utils_fill_with_repeating_pattern(expected_payload, len_bytes);
 
         ber = calculate_ber(rx_payload, expected_payload, len_bytes);
-        if (ber > 0) {
+        if (ber > 0 ) {
             perf_data.error_packets++;
         }
-    }
+    
 
     perf_data.last_packet_ber = ber;
     perf_data.total_packets++;
