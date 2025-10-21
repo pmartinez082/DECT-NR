@@ -127,13 +127,6 @@ static struct dect_phy_perf_data {
 
 	/* Client side TX */
 	struct dect_phy_perf_client_data client_data;
-	float last_packet_ber;
-	float per;
-	unsigned int total_packets;
-	unsigned int error_packets;
-	
-	
-	
 } perf_data;
 
 /**************************************************************************************************/
@@ -150,10 +143,6 @@ static void dect_phy_perf_rx_on_pcc_crc_failure(void);
 static void dect_phy_perf_rx_on_pdc_crc_failure(void);
 static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params);
 
-
-
-
-
 /**************************************************************************************************/
 
 #define DECT_PHY_PERF_EVENT_MDM_OP_COMPLETED  1
@@ -164,8 +153,6 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 #define DECT_PHY_PERF_EVENT_RX_PCC	      6
 #define DECT_PHY_PERF_EVENT_HARQ_TX_WIN_TIMER 7
 #define DECT_PHY_PERF_EVENT_CMD_DONE	      8
-#define DECT_PHY_PERF_EVENT_BER_CALC	      9
-
 
 static int dect_phy_perf_msgq_non_data_op_add(uint16_t event_id);
 static int dect_phy_perf_msgq_data_op_add(uint16_t event_id, void *data, size_t data_size);
@@ -248,27 +235,6 @@ static void dect_phy_perf_prefill_server_rx_harq_feedback_data(void)
 	perf_data.server_data.harq_feedback_data.params = harq_tx_params;
 	perf_data.server_data.harq_feedback_data.header = header;
 }
-/************************************************************************************************** */
-int calculate_per(int ber, int old_per, int packet_num) {
-    int has_error = (ber > 0) ? 100 : 0; 
-    return ((old_per * (packet_num - 1)) + has_error) / packet_num;
-}
-
-
-
-uint32_t calculate_ber(const uint8_t *tx, const uint8_t *rx, size_t len)
-{
-    uint32_t bit_errors = 0;
-    for (size_t i = 0; i < len; i++) {
-        uint8_t diff = tx[i] ^ rx[i];
-        bit_errors += __builtin_popcount(diff);
-    }
-
-    /* Multiply first, then divide to preserve small values */
-    uint32_t ber_hundredths = (bit_errors * 10000) / (len * 8);
-    return ber_hundredths;
-}
-
 
 /**************************************************************************************************/
 
@@ -866,13 +832,13 @@ static int dect_phy_perf_client_start(void)
 		first_possible_tx += MS_TO_MODEM_TICKS(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS);
 	}
 
-	/*desh_print(
+	desh_print(
 		"Starting perf client on channel %d: byte count per TX: %d, slots %d, gap %lld mdm "
 		"ticks, mcs %d, duration %d secs, expected RSSI level on RX %d.",
 		params->channel, perf_pdu_byte_count, params->slot_count,
 		params->slot_gap_count_in_mdm_ticks, params->tx_mcs, params->duration_secs,
 		params->expected_rx_rssi_level);
-*/
+
 	uint16_t perf_pdu_payload_byte_count =
 		perf_pdu_byte_count - DECT_PHY_PERF_TX_DATA_PDU_LEN_WITHOUT_PAYLOAD;
 
@@ -945,12 +911,6 @@ static int dect_phy_perf_start(struct dect_phy_perf_params *params,
 		perf_data.time_started_ms = k_uptime_get();
 		dect_phy_perf_harq_tx_process_table_init(params->client_harq_process_nbr_max);
 		dect_phy_perf_data_rx_metrics_init();
-
-
-			
-			
-			perf_data.last_packet_ber = 100;
-			perf_data.per = 100;
 	}
 
 	perf_data.perf_ongoing = true;
@@ -964,8 +924,8 @@ static int dect_phy_perf_start(struct dect_phy_perf_params *params,
 
 		ret = dect_phy_ctrl_current_radio_mode_get(&radio_mode);
 
-	/*	desh_print("Starting server RX: channel %d, exp_rssi_level %d, duration %d secs.",
-			   params->channel, params->expected_rx_rssi_level, params->duration_secs);*/
+		desh_print("Starting server RX: channel %d, exp_rssi_level %d, duration %d secs.",
+			   params->channel, params->expected_rx_rssi_level, params->duration_secs);
 
 		if (!ret && radio_mode != NRF_MODEM_DECT_PHY_RADIO_MODE_LOW_LATENCY) {
 			uint64_t time_now = dect_app_modem_time_now();
@@ -1006,7 +966,6 @@ static int dect_phy_perf_tx_request_results(void)
 {
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 	struct dect_phy_perf_params *params = &(perf_data.cmd_params);
-	uint8_t encoded_data_to_send[64];
 
 	struct dect_phy_header_type2_format1_t header = {
 		.packet_length = 0,
@@ -1027,7 +986,7 @@ static int dect_phy_perf_tx_request_results(void)
 	union nrf_modem_dect_phy_hdr phy_header;
 	struct nrf_modem_dect_phy_tx_params tx_op;
 	dect_phy_perf_pdu_t perf_pdu;
-	
+	uint8_t encoded_data_to_send[64];
 	int ret = 0;
 
 	uint64_t time_now = dect_app_modem_time_now();
@@ -1102,21 +1061,34 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 	double perf = dect_phy_perf_calculate_throughput(perf_data.tx_metrics.tx_total_data_amount,
 							 elapsed_time_ms);
 
-	//desh_print("perf tx operation completed:");
+	desh_print("perf tx operation completed:");
+	desh_print("  total amount of data sent: %d bytes",
+		   perf_data.tx_metrics.tx_total_data_amount);
+	desh_print("  packet count:              %d", perf_data.tx_metrics.tx_total_pkt_count);
+	desh_print("  elapsed time:              %.2f seconds", (double)elapsed_time_ms / 1000);
+	desh_print("  data rates:                %.2f kbits/seconds", (perf / 1000));
 
-	//results in csv format
-
-
-
-
-//tx_total_pkt_count,elapsed_time_s,throughput_kbps,pcc_crc_errors,pdc_crc_errors,rssi_low_dbm,rssi_high_dbm,snr_low_db,snr_high_db,phy_tx_pwr_low,phy_tx_pwr_high
-	desh_print("%d,%.2f,%.2f\n",
-           perf_data.tx_metrics.tx_total_pkt_count,
-           (double)elapsed_time_ms / 1000,
-           (perf / 1000)
-           );
-
-
+	if (perf_data.cmd_params.use_harq) {
+		desh_print("  No HARQ feedback count:                  %d",
+			   perf_data.tx_metrics.tx_harq_timeout_count);
+		desh_print("  HARQ ACK receive count:                  %d",
+			   perf_data.rx_metrics.harq_ack_rx_count);
+		desh_print("  HARQ NACK receive count:                 %d",
+			   perf_data.rx_metrics.harq_nack_rx_count);
+		desh_print("  HARQ reset NACK receive count:           %d",
+			   perf_data.rx_metrics.harq_reset_nack_rx_count);
+		desh_print("  PCC CRC error count (HARQ feedback RX):  %d",
+			   perf_data.rx_metrics.rx_pcc_crc_error_count);
+		desh_print("  PDC CRC error count (HARQ feedback RX):  %d",
+			   perf_data.rx_metrics.rx_pdc_crc_error_count);
+		desh_print("  RX: RSSI: min %d, max %d", perf_data.rx_metrics.rx_rssi_low_level,
+			   perf_data.rx_metrics.rx_rssi_high_level);
+		desh_print("  RX: SNR: min %d, max %d", perf_data.rx_metrics.rx_snr_low,
+			   perf_data.rx_metrics.rx_snr_high);
+		desh_print("  RX: pwr: min %d, max %d",
+			   perf_data.rx_metrics.rx_phy_transmit_pwr_low,
+			   perf_data.rx_metrics.rx_phy_transmit_pwr_high);
+	}
 
 	ret = dect_phy_perf_tx_request_results();
 	if (ret) {
@@ -1125,7 +1097,7 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 		dect_phy_perf_cmd_done();
 	} else {
 		perf_data.client_data.tx_results_from_server_requested = true;
-		//desh_print("Requested results from the server...");
+		desh_print("Requested results from the server...");
 	}
 	return ret;
 }
@@ -1194,8 +1166,8 @@ static int dect_phy_perf_server_results_tx(char *result_str)
 		desh_error("(%s): nrf_modem_dect_phy_tx failed %d (handle %d)\n", (__func__), ret,
 			   tx_op.handle);
 	} else {
-		/*desh_print("Server results TX scheduled: %d bytes (%d slots, MCS-%d).",
-			   bytes_to_send, header.packet_length + 1, header.df_mcs);*/
+		desh_print("Server results TX scheduled: %d bytes (%d slots, MCS-%d).",
+			   bytes_to_send, header.packet_length + 1, header.df_mcs);
 	}
 
 	return ret;
@@ -1212,65 +1184,54 @@ static void dect_phy_perf_server_report_local_and_tx_results(void)
 				  perf_data.rx_metrics.rx_1st_data_received;
 	double perf = dect_phy_perf_calculate_throughput(perf_data.rx_metrics.rx_total_data_amount,
 							 elapsed_time_ms);
-	
 	char results_str[DECT_PHY_PERF_RESULTS_DATA_MAX_LEN];
 
 	memset(results_str, 0, sizeof(results_str));
 
-	sprintf(results_str, "%d,",
+	sprintf(results_str, "perf server rx operation from tx id %d:\n",
 		perf_data.rx_metrics.rx_last_tx_id);
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  total amount of data:   %d bytes\n",
 		perf_data.rx_metrics.rx_total_data_amount);
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  packet count:           %d\n",
 		perf_data.rx_metrics.rx_total_pkt_count);
-	sprintf(results_str + strlen(results_str), "%.2f,",
+	sprintf(results_str + strlen(results_str), "  elapsed time:           %.2f secs\n",
 		(double)elapsed_time_ms / 1000);
-	sprintf(results_str + strlen(results_str), "%.2f,",
+	sprintf(results_str + strlen(results_str), "  data rates:             %.2f kbits/secs\n",
 		(perf / 1000));
-	
+	sprintf(results_str + strlen(results_str), "  rx restarted count:     %d\n",
+		perf_data.rx_metrics.rx_restarted_count);
 	if (perf_data.tx_metrics.tx_total_data_amount) {
-		sprintf(results_str + strlen(results_str), "%d,",
+		sprintf(results_str + strlen(results_str), "  HARQ feedback tx bytes: %d\n",
 			perf_data.tx_metrics.tx_total_data_amount);
 	}
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  PCC CRC errors: %d\n",
 		perf_data.rx_metrics.rx_pcc_crc_error_count);
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  PDC CRC errors: %d\n",
 		perf_data.rx_metrics.rx_pdc_crc_error_count);
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  out of seqs:    %d\n",
 		perf_data.rx_metrics.rx_out_of_seq_count);
-	sprintf(results_str + strlen(results_str), "%d,",
+	sprintf(results_str + strlen(results_str), "  PCC RX: MCS:    %d\n",
 		perf_data.rx_metrics.rx_testing_mcs);
-	sprintf(results_str + strlen(results_str), "%d,%d,",
+	sprintf(results_str + strlen(results_str), "  PCC RX: RSSI: min:  %d, max: %ddBm\n",
 		perf_data.rx_metrics.rx_rssi_low_level, perf_data.rx_metrics.rx_rssi_high_level);
-	sprintf(results_str + strlen(results_str), "%d,%d,",
+	sprintf(results_str + strlen(results_str), "  PCC RX: TX pwr: min %d, max %d dBm\n",
 		dect_common_utils_phy_tx_power_to_dbm(perf_data.rx_metrics.rx_phy_transmit_pwr_low),
 		dect_common_utils_phy_tx_power_to_dbm(
 			perf_data.rx_metrics.rx_phy_transmit_pwr_high));
-	sprintf(results_str + strlen(results_str), "%d,%d",
+	sprintf(results_str + strlen(results_str), "  PCC RX: SNR: min:    %d, max: %d\n",
 		perf_data.rx_metrics.rx_snr_low, perf_data.rx_metrics.rx_snr_high);
-	sprintf(results_str + strlen(results_str), ",%.3f, %.3f,%d\n",
-	(double)perf_data.per / 100,
-	 (double)perf_data.last_packet_ber / 100,
-	perf_data.error_packets);
 
-	/*desh_print("server: sending result response of total length: %d:\n\"%s\"\n",
+	desh_print("server: sending result response of total length: %d:\n\"%s\"\n",
 		   (strlen(results_str) + 1), results_str);
-*/
 
-
-	
-	 //Send results to client: 
+	/* Send results to client: */
 	(void)nrf_modem_dect_phy_cancel(DECT_PHY_PERF_SERVER_RX_HANDLE);
 	if (dect_phy_perf_server_results_tx(results_str)) {
 		desh_error("Cannot start sending server results");
 	}
 
-
 	/* Clear results */
-	desh_print("%s", results_str);
 	dect_phy_perf_data_rx_metrics_init();
-
-
 }
 
 void dect_phy_perf_mdm_op_completed(
@@ -1349,7 +1310,7 @@ void dect_phy_perf_mdm_op_completed(
 				if (secs_left == 0) {
 					dect_phy_perf_msgq_non_data_op_add(
 						DECT_PHY_PERF_EVENT_SERVER_REPORT);
-					//desh_print("Server RX completed.");
+					desh_print("Server RX completed.");
 					dect_phy_perf_cmd_done();
 				} else if (!perf_data.server_data.rx_results_sent) {
 					if (perf_data.cmd_params.role ==
@@ -1360,9 +1321,9 @@ void dect_phy_perf_mdm_op_completed(
 							perf_data.cmd_params;
 
 						copy_params.duration_secs = secs_left;
-						/*desh_print("Server RX completed but duration left: "
+						desh_print("Server RX completed but duration left: "
 							   "restarting (%d secs).",
-							   secs_left);*/
+							   secs_left);
 						dect_phy_perf_start(&copy_params, RESTART);
 					}
 				}
@@ -1371,9 +1332,9 @@ void dect_phy_perf_mdm_op_completed(
 				 * usually means a fundamental failure and then it is better to
 				 * quit.
 				 */
-				/*if (perf_data.cmd_params.role == DECT_PHY_COMMON_ROLE_SERVER &&
+				if (perf_data.cmd_params.role == DECT_PHY_COMMON_ROLE_SERVER &&
 				    perf_data.rx_metrics.rx_req_count_on_going == 0 &&
-				    z_delta_ms > 40000) {
+				    z_delta_ms > 500) {
 					struct dect_phy_perf_params copy_params =
 						perf_data.cmd_params;
 
@@ -1383,11 +1344,11 @@ void dect_phy_perf_mdm_op_completed(
 					desh_error(
 						"perf server RX failed - perf server RX stopped.");
 					dect_phy_perf_cmd_done();
-				}*/
+				}
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PERF_RESULTS_REQ_TX_HANDLE) {
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-			//	desh_print("RESULT_REQ sent.");
+				desh_print("RESULT_REQ sent.");
 			} else {
 				desh_warn("RESULT_REQ sending failed.");
 			}
@@ -1396,7 +1357,7 @@ void dect_phy_perf_mdm_op_completed(
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
 				desh_print("RESULT_RESP sent.");
 			} else {
-			//	desh_warn("RESULT_RESP sending failed.");
+				desh_warn("RESULT_RESP sending failed.");
 			}
 
 			uint16_t secs_left = dect_phy_perf_time_secs_left();
@@ -1407,9 +1368,9 @@ void dect_phy_perf_mdm_op_completed(
 					desh_print("Server RX will be continued after result TX is "
 						   "done.");
 				} else {
-					/*desh_print("Server RX will be continued (%d secs) after "
+					desh_print("Server RX will be continued (%d secs) after "
 						   "result TX is done.",
-						   secs_left);*/
+						   secs_left);
 				}
 				if (perf_data.cmd_params.duration_secs) {
 					struct dect_phy_perf_params copy_params =
@@ -1426,7 +1387,7 @@ void dect_phy_perf_mdm_op_completed(
 		} else if (mdm_completed_params->handle == DECT_PHY_PERF_RESULTS_RESP_RX_HANDLE) {
 			/* Client */
 			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-				//desh_print("RX for perf results done.");
+				desh_print("RX for perf results done.");
 			} else {
 				desh_print("RX for perf results failed.");
 			}
@@ -1514,9 +1475,9 @@ static void dect_phy_perf_thread_fn(void)
 				    params->handle == DECT_PHY_PERF_RESULTS_REQ_TX_HANDLE ||
 				    params->handle == DECT_PHY_PERF_RESULTS_RESP_TX_HANDLE ||
 				    params->handle == DECT_PHY_PERF_RESULTS_RESP_RX_HANDLE) {
-					/*desh_warn("%s: perf modem operation failed: %s, "
+					desh_warn("%s: perf modem operation failed: %s, "
 						  "handle %d",
-						  __func__, tmp_str, params->handle);*/
+						  __func__, tmp_str, params->handle);
 					dect_phy_perf_mdm_op_completed(params);
 				} else if (params->handle == DECT_HARQ_FEEDBACK_TX_HANDLE) {
 					desh_error("%s: cannot TX HARQ feedback: %s", __func__,
@@ -1564,21 +1525,6 @@ static void dect_phy_perf_thread_fn(void)
 			}
 			break;
 		}
-
-		case DECT_PHY_PERF_EVENT_BER_CALC: {
-			struct dect_phy_perf_ber_calc_params *params =
-				(struct dect_phy_perf_ber_calc_params *)event.data;
-
-			
-			//perf_data.last_packet_ber = params->ber;  
-
-		
-			
-			break;
-		}
-				
-
-
 		case DECT_PHY_PERF_EVENT_RX_PDC_CRC_ERROR: {
 			struct dect_phy_common_op_pdc_crc_fail_params *params =
 				(struct dect_phy_common_op_pdc_crc_fail_params *)event.data;
@@ -1918,68 +1864,75 @@ void dect_phy_perf_rx_on_pdc_crc_failure(void)
 
 static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params)
 {
-    dect_phy_perf_pdu_t pdu;
-    int ret;
+	dect_phy_perf_pdu_t pdu;
+	int ret;
 
-    if (!perf_data.perf_ongoing) {
-        desh_error("receiving perf data but perf not running.");
-        return -1;
-    }
+	if (!perf_data.perf_ongoing) {
+		desh_error("receiving perf data but perf not running.");
+		return -1;
+	}
 
-    ret = dect_phy_perf_pdu_decode(&pdu, (const uint8_t *)params->data);
-    if (ret) {
-        perf_data.rx_metrics.rx_decode_error++;
-        desh_error("dect_phy_perf_pdu_decode failed: %d", ret);
-        return -EBADMSG;
-    }
+	ret = dect_phy_perf_pdu_decode(&pdu, (const uint8_t *)params->data);
+	if (ret) {
+		perf_data.rx_metrics.rx_decode_error++;
+		desh_error("dect_phy_perf_pdu_decode failed: %d", ret);
+		return -EBADMSG;
+	}
+	if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_TX_DATA) {
+		perf_data.rx_metrics.rx_testing_mcs = perf_data.rx_metrics.rx_latest_mcs;
+		if (perf_data.rx_metrics.rx_total_data_amount == 0) {
+			perf_data.rx_metrics.rx_1st_data_received = k_uptime_get();
+			perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
+		} else {
+			if (pdu.message.tx_data.seq_nbr !=
+			    (perf_data.rx_metrics.rx_last_seq_nbr + 1)) {
+				struct dect_phy_perf_params *cmd_params = &(perf_data.cmd_params);
 
-    /* ============================================================
- * BER / PER CALCULATION SECTION
- * ============================================================ */
-if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_TX_DATA) {
-
-    const uint8_t *rx_payload = pdu.message.tx_data.pdu_payload;
-    int len_bytes = pdu.message.tx_data.payload_length;
-
-    uint32_t ber = 1;
-
-    
-
-     
-        // Calculate bit errors normally for CRC-passed packets
-        uint8_t expected_payload[DECT_PHY_PERF_TX_DATA_PDU_PAYLOAD_MAX_LEN];
-        dect_common_utils_fill_with_repeating_pattern(expected_payload, len_bytes);
-
-        ber = calculate_ber(rx_payload, expected_payload, len_bytes);
-        if (ber > 0 ) {
-            perf_data.error_packets++;
-        }
-    
-
-    perf_data.last_packet_ber = ber;
-    perf_data.total_packets++;
-
-    
-
-/* ============================================================ */
-
-        /* Update RX metrics */
-        perf_data.rx_metrics.rx_testing_mcs = perf_data.rx_metrics.rx_latest_mcs;
-        perf_data.rx_metrics.rx_total_data_amount += params->data_length;
-        perf_data.rx_metrics.rx_total_pkt_count++;
-		// PER in hundredths of percent
-    	perf_data.per = (perf_data.error_packets * 10000) / perf_data.rx_metrics.rx_total_pkt_count;
-        perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
-        perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
-        perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
-
-        /* Out-of-sequence check */
-        if (pdu.message.tx_data.seq_nbr != perf_data.rx_metrics.rx_last_seq_nbr + 1) {
-            perf_data.rx_metrics.rx_out_of_seq_count++;
-        }
-    }
-
-    return 0;
+				perf_data.rx_metrics.rx_out_of_seq_count++;
+				if (cmd_params->debugs) {
+					desh_warn("Out of seq in RX: rx_out_of_seq_count %d, "
+						  "pdu.seq_nbr %d, perf_data.rx_last_seq_nbr "
+						  "%d",
+						  perf_data.rx_metrics.rx_out_of_seq_count,
+						  pdu.message.tx_data.seq_nbr,
+						  perf_data.rx_metrics.rx_last_seq_nbr);
+				}
+			}
+		}
+		perf_data.rx_metrics.rx_total_data_amount += params->data_length;
+		perf_data.rx_metrics.rx_total_pkt_count++;
+		perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
+		perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
+		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
+	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
+		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
+			desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);
+			dect_phy_perf_msgq_non_data_op_add(DECT_PHY_PERF_EVENT_SERVER_REPORT);
+		} else if (pdu.header.transmitter_id ==
+				perf_data.rx_metrics.rx_last_tx_id_from_pcc) {
+			desh_warn("PERF_RESULTS_REQ received from tx id %d - but no perf "
+				  "data received from there.\n"
+				  "However, we have seen a PCC lastly from this tx id %d - "
+				  "so sending results to there.\n"
+				  "Please, check MCS and/or TX PWR on a client side.",
+				  pdu.header.transmitter_id,
+				  perf_data.rx_metrics.rx_last_tx_id_from_pcc);
+			perf_data.rx_metrics.rx_last_tx_id =
+				perf_data.rx_metrics.rx_last_tx_id_from_pcc;
+			dect_phy_perf_msgq_non_data_op_add(DECT_PHY_PERF_EVENT_SERVER_REPORT);
+		} else {
+			desh_warn("PERF_RESULTS_REQ received from tx id %d - but no perf "
+				  "session with it (last seen tx id %d). "
+				  "Check MCS and/or TX PWR on a client side.",
+				  pdu.header.transmitter_id, perf_data.rx_metrics.rx_last_tx_id);
+		}
+	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_RESP) {
+		desh_print("Server results received:");
+		desh_print("%s", pdu.message.results.results_str);
+	} else {
+		desh_warn("type %d", pdu.header.message_type);
+	}
+	return 0;
 }
 
 /**************************************************************************************************/
