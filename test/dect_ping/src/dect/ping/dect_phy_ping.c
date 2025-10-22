@@ -207,8 +207,8 @@ static void dect_phy_ping_rx_metrics_reset(struct dect_phy_ping_params *params)
 	ping_data.rx_metrics.rx_snr_high = -9999;
 	ping_data.rx_metrics.total_packets = 0;
 	ping_data.rx_metrics.error_packets = 0;
-	ping_data.rx_metrics.per = 100;
-	ping_data.rx_metrics.ber = 100;
+	ping_data.rx_metrics.per = 0;
+	ping_data.rx_metrics.ber = 0;
 
 }
 
@@ -699,6 +699,7 @@ static void dect_phy_ping_rssi_scan_print(void)
 		}
 	}
 }
+
 
 static void dect_phy_ping_rssi_curr_data_reset(void)
 {
@@ -1211,7 +1212,7 @@ dect_phy_ping_client_report_local_results_and_req_server_results(int64_t *elapse
 			ping_data.rx_metrics.rx_phy_transmit_pwr_high));
 	desh_print("  rx: min SNR %d, max SNR %d", ping_data.rx_metrics.rx_snr_low,
 		   ping_data.rx_metrics.rx_snr_high);
-
+	
 	ret = dect_phy_ping_tx_request_results();
 	if (ret) {
 		desh_error("Failed (err =%d) to request results from the server.", ret);
@@ -1449,6 +1450,8 @@ static void dect_phy_ping_server_report_local_and_tx_results(void)
 			ping_data.rx_metrics.rx_phy_transmit_pwr_high));
 	sprintf(results_str + strlen(results_str), "  rx: min SNR %d, max SNR %d\n",
 		ping_data.rx_metrics.rx_snr_low, ping_data.rx_metrics.rx_snr_high);
+	sprintf(results_str + strlen(results_str), "  rx: PER                      %d\n", ping_data.rx_metrics.per);
+	sprintf(results_str + strlen(results_str), "  rx: BER                      %d\n", ping_data.rx_metrics.ber);
 
 	desh_print("%s", results_str);
 
@@ -1735,13 +1738,11 @@ static void dect_phy_ping_thread_fn(void)
 
 			}
 			if (cmd_params->debugs) {
-				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d "
-					  "(%d dBm), BER %d, error packets %d",
+				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %d",
 					  params->time, params->crc_failure.snr,
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2),
-					  cmd_params-> ber/100,
-					  cmd_params-> error_packets);
+					);
 				
 				
 			}
@@ -2087,32 +2088,45 @@ void dect_phy_ping_cmd_stop(void)
 
 void dect_phy_ping_rx_on_pcc_crc_failure(void)
 {
+	desh_print("PCC CRC error received");
 	if (!ping_data.on_going) {
 		desh_error("receiving ping data but ping is not running.");
 		return;
 	}
 	ping_data.rx_metrics.rx_pcc_crc_error_count++;
-	ping_data.rx_metrics.error_packets++;
-	ping_data.cmd_params.error_packets++;
-	ping_data.cmd_params.total_packets++;
-	ping_data.rx_metrics.total_packets++;
 	
-	ping_data.cmd_params.ber = 100;// We dont know the PCC content, so we assume 100% BER
-	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + ping_data.cmd_params.ber) *100/ (ping_data.rx_metrics.total_packets );
+	
+	ping_data.rx_metrics.total_packets++;
+	ping_data.rx_metrics.error_packets++;
+	dect_phy_ping_pdu_t pdu;
+
+	
+	pdu.message.tx_data.ber = 100;// We dont know the PCC content, so we assume 100% BER
+	if (ping_data.rx_metrics.total_packets == 1)
+	{
+		ping_data.rx_metrics.ber = pdu.message.tx_data.ber;
+		
+	}
+	else{
+	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
+
+	}
+	
 	ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;	
+dect_phy_pdu_utils_ping_print(&pdu);
 }
 
 void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
 {
+	desh_print("PDC CRC error received");
 	if (!ping_data.on_going) {
 		desh_error("receiving ping data but ping is not running.");
 		return;
 	}
 	ping_data.rx_metrics.rx_pdc_crc_error_count++;
 	ping_data.rx_metrics.error_packets++;
-	ping_data.cmd_params.error_packets++;
-	ping_data.cmd_params.total_packets++;
 	ping_data.rx_metrics.total_packets++;
+	desh_print("total packets: %d, error packets: %d", ping_data.rx_metrics.total_packets, ping_data.rx_metrics.error_packets);
 	dect_phy_ping_pdu_t pdu, expected;
 	int ret = dect_phy_ping_pdu_decode(&pdu, (const uint8_t *)params->data);
 	if (ret) {
@@ -2122,13 +2136,22 @@ void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params 
 	}
 	dect_common_utils_fill_with_repeating_pattern(expected.message.tx_data.pdu_payload, params->data_length);
 	
-	ping_data.cmd_params.ber = calculate_ber(pdu.message.tx_data.pdu_payload, expected.message.tx_data.pdu_payload, params->data_length); //  only PDU is checked because PCC error == 0 (it will probably be 0 anyway)
-	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + ping_data.cmd_params.ber) *100/ (ping_data.rx_metrics.total_packets );
+	pdu.message.tx_data.ber = calculate_ber(pdu.message.tx_data.pdu_payload, expected.message.tx_data.pdu_payload, sizeof(expected.message.tx_data.pdu_payload)); //  only PDU is checked because PCC error == 0 (it will probably be 0 anyway)
+	if(ping_data.rx_metrics.total_packets == 1){
+
+		ping_data.rx_metrics.ber = pdu.message.tx_data.ber;
+		
+	}
+		else{
+	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
 	ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;
+		}
+	dect_phy_pdu_utils_ping_print(&pdu);
 }
 
 static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params)
 {
+	desh_print("PDC data received, no errors");
 	dect_phy_ping_pdu_t pdu;
 	int ret;
 
@@ -2170,10 +2193,14 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		ping_data.server_data.rx_last_tx_id = pdu.header.transmitter_id;
 		ping_data.server_data.rx_last_data_received = k_uptime_get();
 		// BER is 0 because PCC error is 0
-		ping_data.cmd_params.ber = 0;
-		ping_data.rx_metrics.ber = ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) /(ping_data.rx_metrics.total_packets);
-		ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;
-
+		pdu.message.tx_data.ber = 0;
+		if(ping_data.rx_metrics.total_packets == 1){
+			ping_data.rx_metrics.ber = 0;
+			ping_data.rx_metrics.per = 0;}
+		else{
+			ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;
+			ping_data.rx_metrics.ber = ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) /(ping_data.rx_metrics.total_packets);
+		}
 		ret = dect_phy_ping_server_ping_resp_tx(params, &pdu);
 		if (ret) {
 			desh_error("Cannot send ping response: err %d", ret);
@@ -2284,6 +2311,7 @@ static int dect_phy_ping_init(void)
 int calculate_ber(const uint8_t *received, const uint8_t *expected, size_t len_bytes) { 
 	int error_bits = 0;
 	int total_bits = len_bytes * 8;
+	
 	for (size_t i = 0; i < len_bytes; i++) {
 		uint8_t diff = received[i] ^ expected[i];
 		for (int b = 0; b < 8; b++) {

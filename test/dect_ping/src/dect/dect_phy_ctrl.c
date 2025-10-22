@@ -919,6 +919,8 @@ static void dect_phy_ctrl_mdm_on_pdc_crc_failure_cb(
 	struct dect_phy_common_op_pdc_crc_fail_params pdc_crc_fail_params = {
 		.time = *time,
 		.crc_failure = *evt,
+		.error_packets = *evt,
+		.ber = *evt,
 	};
 
 	dect_phy_ctrl_msgq_data_op_add(DECT_PHY_CTRL_OP_PHY_API_MDM_RX_PDC_CRC_ERROR,

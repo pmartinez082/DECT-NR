@@ -83,7 +83,7 @@ void dect_phy_pdu_utils_ping_print(dect_phy_ping_pdu_t *ping_pdu)
 		   dect_common_pdu_message_type_to_string(ping_pdu->header.message_type, snum));
 	desh_print("  Transmitter ID:       %d", ping_pdu->header.transmitter_id);
 	desh_print("  Power control:");
-	desh_print("    Expected RX RSSI level (dBm): %d",
+	desh_print("  Expected RX RSSI level (dBm): %d",
 		   ping_pdu->header.pwr_ctrl_expected_rssi_level_dbm);
 	if (ping_pdu->header.message_type == DECT_MAC_MESSAGE_TYPE_PING_REQUEST ||
 	    ping_pdu->header.message_type == DECT_MAC_MESSAGE_TYPE_PING_RESPONSE) {
@@ -100,7 +100,11 @@ void dect_phy_pdu_utils_ping_print(dect_phy_ping_pdu_t *ping_pdu)
 			sprintf(&ascii_data[i], "%c", ping_pdu->message.tx_data.pdu_payload[i]);
 		}
 		ascii_data[i + 1] = '\0';
+		desh_print("  BER:	            	%d", ping_pdu->message.tx_data.ber);
+
 		desh_print("  payload data: %s", ascii_data);
+		
+		
 	} else if (ping_pdu->header.message_type == DECT_MAC_MESSAGE_TYPE_PING_RESULTS_REQ) {
 
 	} else if (ping_pdu->header.message_type == DECT_MAC_MESSAGE_TYPE_PING_RESULTS_RESP) {

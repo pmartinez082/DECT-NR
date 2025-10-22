@@ -26,7 +26,7 @@ typedef enum {
 #define DECT_PHY_PING_PDU_COMMON_PART_LEN                                                          \
 	(sizeof(dect_phy_ping_pdu_message_type_t) + sizeof(uint8_t) + sizeof(uint16_t))
 #define DECT_PHY_PING_TX_DATA_PDU_LEN_WITHOUT_PAYLOAD                                              \
-	(DECT_PHY_PING_PDU_COMMON_PART_LEN + (2 * sizeof(uint16_t)))
+	(DECT_PHY_PING_PDU_COMMON_PART_LEN + (3 * sizeof(uint16_t)))
 #define DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN                                                  \
 	(DECT_DATA_MAX_LEN - DECT_PHY_PING_TX_DATA_PDU_LEN_WITHOUT_PAYLOAD)
 #define DECT_PHY_PING_RESULTS_REQ_LEN	   (DECT_PHY_PING_PDU_COMMON_PART_LEN + sizeof(uint32_t))
@@ -43,6 +43,7 @@ typedef struct {
 typedef struct {
 	uint16_t seq_nbr;
 	uint16_t payload_length;
+	uint16_t ber;
 	uint8_t pdu_payload[DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN];
 } dect_phy_ping_pdu_tx_data;
 
@@ -56,11 +57,14 @@ typedef struct {
 	dect_phy_ping_pdu_message_type_t message_type; /* Note: only 7 bit */
 	int8_t pwr_ctrl_expected_rssi_level_dbm;
 	uint16_t transmitter_id;
+	
 } dect_phy_ping_pdu_header_t;
 
 typedef struct {
 	dect_phy_ping_pdu_header_t header;
 	dect_phy_ping_pdu_message_t message;
+	
+	
 } dect_phy_ping_pdu_t;
 
 #define DECT_PHY_PING_PDU_HEADER_LEN (sizeof(dect_phy_ping_pdu_header_t))

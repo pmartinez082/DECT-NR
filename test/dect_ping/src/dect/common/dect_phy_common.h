@@ -58,6 +58,7 @@ struct dect_phy_common_op_pdc_crc_fail_params {
 	struct nrf_modem_dect_phy_pdc_crc_failure_event crc_failure;
 	uint32_t data_length;
 	uint8_t data[DECT_DATA_MAX_LEN];
+	uint16_t ber, error_packets;
 
 };
 
