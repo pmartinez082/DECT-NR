@@ -119,10 +119,7 @@ struct dect_phy_ping_params {
 
 	bool use_harq;
 
-	uint32_t ber;
-	
-	int error_packets;
-	int total_packets;
+
 };
 
 /******************************************************************************/

@@ -75,8 +75,13 @@ int dect_phy_ping_pdu_decode(dect_phy_ping_pdu_t *p_target, const uint8_t *p_dat
 	return 0;
 }
 
-void dect_phy_pdu_utils_ping_print(dect_phy_ping_pdu_t *ping_pdu)
+void dect_phy_pdu_utils_ping_print( dect_phy_ping_pdu_t *ping_pdu)
 {
+// print in CSV format
+// header fields: channel, mcs, snr, ber
+
+	
+	
 	char snum[64] = {0};
 
 	desh_print("  Type:                 %s",
@@ -110,6 +115,8 @@ void dect_phy_pdu_utils_ping_print(dect_phy_ping_pdu_t *ping_pdu)
 	} else if (ping_pdu->header.message_type == DECT_MAC_MESSAGE_TYPE_PING_RESULTS_RESP) {
 		desh_print("  results data: %s", ping_pdu->message.results.results_str);
 	}
+	
+
 }
 
 /**************************************************************************************************/

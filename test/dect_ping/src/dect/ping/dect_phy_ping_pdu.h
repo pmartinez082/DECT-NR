@@ -43,8 +43,8 @@ typedef struct {
 typedef struct {
 	uint16_t seq_nbr;
 	uint16_t payload_length;
-	uint16_t ber;
 	uint8_t pdu_payload[DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN];
+	uint16_t ber;
 } dect_phy_ping_pdu_tx_data;
 
 typedef union {
@@ -73,6 +73,6 @@ typedef struct {
 
 uint8_t *dect_phy_ping_pdu_encode(uint8_t *p_target, const dect_phy_ping_pdu_t *p_input);
 int dect_phy_ping_pdu_decode(dect_phy_ping_pdu_t *p_target, const uint8_t *p_data);
-void dect_phy_pdu_utils_ping_print(dect_phy_ping_pdu_t *ping_pdu);
+void dect_phy_pdu_utils_ping_print( dect_phy_ping_pdu_t *ping_pdu);
 
 #endif /* DECT_PHY_PING_PDU_H */

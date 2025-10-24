@@ -166,8 +166,8 @@ static struct dect_phy_ping_harq_tx_process_info
 /**************************************************************************************************/
 
 static void dect_phy_ping_rx_on_pcc_crc_failure(void);
-static int calculate_ber(const uint8_t *p_received_data, const uint8_t *p_expected_data, uint32_t data_length);
-static void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params);
+static int calculate_ber(const uint8_t *p_received_data, const uint8_t *p_expected_data, size_t data_length);
+static int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params);
 static int dect_phy_ping_msgq_non_data_op_add(uint16_t event_id);
 static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params);
 
@@ -933,7 +933,7 @@ static int dect_phy_ping_client_start(void)
 		header.feedback.format1.harq_process_number0 = DECT_HARQ_CLIENT;
 	}
 
-	desh_print("Starting ping client on channel %d:\n"
+/*	desh_print("Starting ping client on channel %d:\n"
 		   "  byte count per TX: %d, slots %d, interval %d secs,\n"
 		   "  mcs %d, LBT period %d, count %d, timeout %d msecs, HARQ: %s,\n"
 		   "  expected RSSI level on RX %d.",
@@ -941,7 +941,7 @@ static int dect_phy_ping_client_start(void)
 		   params->tx_mcs, params->tx_lbt_period_symbols, params->ping_count,
 		   params->timeout_msecs, (params->use_harq) ? "yes" : "no",
 		   params->expected_rx_rssi_level);
-
+*/
 	uint16_t ping_pdu_payload_byte_count =
 		ping_pdu_byte_count - DECT_PHY_PING_TX_DATA_PDU_LEN_WITHOUT_PAYLOAD;
 
@@ -1055,8 +1055,8 @@ static int dect_phy_ping_start(struct dect_phy_ping_params *params,
 	} else {
 		__ASSERT_NO_MSG(params->role == DECT_PHY_COMMON_ROLE_SERVER);
 
-		desh_print("Starting ping server RX: channel %d, exp_rssi_level %d.",
-			   params->channel, params->expected_rx_rssi_level);
+	/*	desh_print("Starting ping server RX: channel %d, exp_rssi_level %d.",
+			   params->channel, params->expected_rx_rssi_level);*/
 		ret = dect_phy_ping_server_rx_start(start_time);
 	}
 	return ret;
@@ -1180,7 +1180,7 @@ dect_phy_ping_client_report_local_results_and_req_server_results(int64_t *elapse
 		DECT_PHY_PING_CLIENT_TX_HANDLE);
 	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
 		DECT_PHY_PING_CLIENT_RX_HANDLE);
-
+/*
 	desh_print("ping client operation completed:");
 	desh_print("  elapsed time:                            %.2f seconds", elapsed_time_secs);
 	desh_print("  tx: total amount of data sent:           %d bytes",
@@ -1221,6 +1221,7 @@ dect_phy_ping_client_report_local_results_and_req_server_results(int64_t *elapse
 		ping_data.client_data.tx_results_from_server_requested = true;
 		desh_print("Requested ping results from the server...");
 	}
+		*/
 	/* Clear results */
 	struct dect_phy_ping_params *params = &(ping_data.cmd_params);
 
@@ -1484,8 +1485,7 @@ void dect_phy_ping_mdm_op_completed(
 				dect_phy_ping_client_data_tx_total_data_amount_decrease();
 				desh_print("ping tx failed.");
 			} else {
-				desh_print("ping sent (seq_nbr %d).",
-					   ping_data.client_data.tx_next_seq_nbr);
+				//desh_print("ping sent (seq_nbr %d).",ping_data.client_data.tx_next_seq_nbr);
 			}
 			/* We count both success and failures here */
 			ping_data.tx_metrics.tx_total_ping_req_count++;
@@ -1525,18 +1525,18 @@ void dect_phy_ping_mdm_op_completed(
 		} else if (mdm_completed_params->handle == DECT_PHY_PING_SERVER_TX_HANDLE) {
 			if (mdm_completed_params->status != NRF_MODEM_DECT_PHY_SUCCESS) {
 				/* TX was not done */
-				desh_print("ping resp tx failed.");
+				//desh_print("ping resp tx failed.");
 			} else {
-				desh_print("ping resp sent (seq_nbr %d).",
+				/*desh_print("ping resp sent (seq_nbr %d).",
 					   ping_data.server_data.rx_last_seq_nbr);
-				ping_data.tx_metrics.tx_total_ping_resp_count++;
+				ping_data.tx_metrics.tx_total_ping_resp_count++;*/
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PING_CLIENT_RX_HANDLE) {
 			dect_phy_ping_rssi_done_evt_send();
 			if (!ping_data.client_data.tx_ping_resp_received &&
 			    !harq_processes[DECT_HARQ_CLIENT].rtx_ongoing) {
-				desh_warn("ping timeout for seq_nbr %d",
-					  ping_data.client_data.tx_next_seq_nbr - 1);
+			/*	desh_warn("ping timeout for seq_nbr %d",
+					  ping_data.client_data.tx_next_seq_nbr - 1);*/
 			}
 			if (ping_data.client_data.tx_scheduler_intervals_done &&
 			    !harq_processes[DECT_HARQ_CLIENT].rtx_ongoing &&
@@ -1554,9 +1554,9 @@ void dect_phy_ping_mdm_op_completed(
 				desh_print("ping retransmission based on HARQ done.");
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PING_RESULTS_REQ_TX_HANDLE) {
-			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
-				desh_print("PING_RESULT_REQ sent.");
-			} else {
+			if (mdm_completed_params->status == NRF_MODEM_DECT_PHY_SUCCESS) {		
+						//desh_print("PING_RESULT_REQ sent.");
+			}else {
 				desh_warn("PING_RESULT_REQ sending failed.");
 			}
 		} else if (mdm_completed_params->handle == DECT_PHY_PING_RESULTS_RESP_TX_HANDLE) {
@@ -1611,8 +1611,7 @@ void dect_phy_ping_mdm_op_completed(
 					dect_phy_ping_start(
 						&copy_params, RESTART, first_possible_start);
 				} else {
-					desh_error(
-						"ping server RX failed - ping server RX stopped.");
+					//desh_error(					"ping server RX failed - ping server RX stopped.");
 					dect_phy_ping_cmd_done();
 				}
 			}
@@ -1643,7 +1642,7 @@ static void dect_phy_ping_thread_fn(void)
 			break;
 		}
 		case DECT_PHY_PING_EVENT_CLIENT_SCHEDULER_PINGING_DONE: {
-			desh_print("pinging done by scheduler");
+			//desh_print("pinging done by scheduler");
 			ping_data.client_data.tx_scheduler_intervals_done = true;
 			break;
 		}
@@ -1696,7 +1695,7 @@ static void dect_phy_ping_thread_fn(void)
 			struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
 			
 						
-
+			
 			if (ping_data.on_going) {
 				dect_phy_ping_rx_on_pcc_crc_failure();
 			}
@@ -1725,25 +1724,30 @@ static void dect_phy_ping_thread_fn(void)
 		}
 		case DECT_PHY_PING_EVENT_RX_PDC_CRC_ERROR: {
 			struct dect_phy_common_op_pdc_crc_fail_params *params =
-				(struct dect_phy_common_op_pdc_crc_fail_params *)event.data;
+	(struct dect_phy_common_op_pdc_crc_fail_params *)event.data;
+
 			struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
 						struct dect_phy_data_rcv_common_params rcv_params = {
 				.data_length = params->data_length,
 				.data = params->data,
 			};
-
+			int ber  = 0;
 			if (ping_data.on_going) {
-				dect_phy_ping_rx_on_pdc_crc_failure(&rcv_params);
+				ber =dect_phy_ping_rx_on_pdc_crc_failure(&rcv_params);
 				
 
 			}
 			if (cmd_params->debugs) {
-				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %d",
+				// header fields: channel, mcs, snr, ber
+				desh_print("PDC,%d,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr, ber);
+				/*
+				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %%%d",
 					  params->time, params->crc_failure.snr,
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2),
+					  ber
 					);
-				
+				*/
 				
 			}
 			break;
@@ -1798,7 +1802,7 @@ static void dect_phy_ping_thread_fn(void)
 			}
 
 			if (cmd_params->debugs) {
-				desh_print("PCC received (time %llu, handle %d): "
+			/*	desh_print("PCC received (time %llu, handle %d): "
 					   "status: \"%s\", snr %d, "
 					   "RSSI-2 %d (RSSI %d), stf_start_time %llu",
 					   params->time, params->pcc_status.handle,
@@ -1810,7 +1814,11 @@ static void dect_phy_ping_thread_fn(void)
 					   transmitter_id);
 				desh_print("    receiver id: %d", receiver_id);
 				desh_print("    len %d, MCS %d, TX pwr: %d dBm",
-					   phy_h->packet_length, phy_h->df_mcs, pcc_rx_pwr_dbm);
+					   phy_h->packet_length, phy_h->df_mcs, pcc_rx_pwr_dbm);*/
+
+				// CSV header fields: channel, mcs, snr, ber
+				struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
+				desh_print("PCC,1,%d,%d",  params->pcc_status.snr, 0);
 			}
 
 			/* Handle HARQ feedback */
@@ -1889,12 +1897,15 @@ static void dect_phy_ping_thread_fn(void)
 			struct nrf_modem_dect_phy_pdc_event *p_rx_status = &(params->rx_status);
 			int16_t rssi_level = p_rx_status->rssi_2 / 2;
 
-			desh_print("PDC received (time %llu, handle %d): snr %d, RSSI-2 %d "
+			/*desh_print("PDC received (time %llu, handle %d): snr %d, RSSI-2 %d "
 				   "(RSSI %d), len %d",
 				   params->time, p_rx_status->handle,
 				   p_rx_status->snr, p_rx_status->rssi_2, rssi_level,
-				   params->data_length);
+				   params->data_length);*/
 
+			// CSV header fields: channel, mcs, snr, ber
+			struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
+		//	desh_print("PDC,%d,%d,%d\n", cmd_params-> tx_mcs, p_rx_status->snr, 0);
 			if (params->data_length) {
 				uint8_t *pdu_type_ptr = (uint8_t *)params->data;
 				uint8_t pdu_type = *pdu_type_ptr & DECT_COMMON_UTILS_BIT_MASK_7BIT;
@@ -2101,57 +2112,77 @@ void dect_phy_ping_rx_on_pcc_crc_failure(void)
 	dect_phy_ping_pdu_t pdu;
 
 	
-	pdu.message.tx_data.ber = 100;// We dont know the PCC content, so we assume 100% BER
+	pdu.message.tx_data.ber = 100;	// Changing later
 	if (ping_data.rx_metrics.total_packets == 1)
 	{
 		ping_data.rx_metrics.ber = pdu.message.tx_data.ber;
 		
 	}
 	else{
-	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
+		ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
 
 	}
 	
 	ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;	
-dect_phy_pdu_utils_ping_print(&pdu);
+
 }
 
-void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
+int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
 {
 	desh_print("PDC CRC error received");
 	if (!ping_data.on_going) {
 		desh_error("receiving ping data but ping is not running.");
-		return;
+		return -1;
 	}
 	ping_data.rx_metrics.rx_pdc_crc_error_count++;
 	ping_data.rx_metrics.error_packets++;
 	ping_data.rx_metrics.total_packets++;
-	desh_print("total packets: %d, error packets: %d", ping_data.rx_metrics.total_packets, ping_data.rx_metrics.error_packets);
+	//desh_print("total packets: %d, error packets: %d", ping_data.rx_metrics.total_packets, ping_data.rx_metrics.error_packets);
 	dect_phy_ping_pdu_t pdu, expected;
 	int ret = dect_phy_ping_pdu_decode(&pdu, (const uint8_t *)params->data);
 	if (ret) {
 		ping_data.rx_metrics.rx_decode_error++;
 		desh_error("dect_phy_ping_pdu_decode failed: %d", ret);
-		return;
+		return -1;
 	}
 	dect_common_utils_fill_with_repeating_pattern(expected.message.tx_data.pdu_payload, params->data_length);
-	
-	pdu.message.tx_data.ber = calculate_ber(pdu.message.tx_data.pdu_payload, expected.message.tx_data.pdu_payload, sizeof(expected.message.tx_data.pdu_payload)); //  only PDU is checked because PCC error == 0 (it will probably be 0 anyway)
-	if(ping_data.rx_metrics.total_packets == 1){
+	desh_print("expected payload and received payload compared for BER calculation");
 
-		ping_data.rx_metrics.ber = pdu.message.tx_data.ber;
-		
-	}
-		else{
-	ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
-	ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;
+	/* Print short hex previews instead of treating payloads as strings */
+	int preview = (params->data_length > 16) ? 16 : params->data_length;
+	char exp_preview[3 * 16 + 1] = {0};
+	char rcv_preview[3 * 16 + 1] = {0};
+	int eidx = 0;
+	int ridx = 0;
+	for (int i = 0; i < preview; i++) {
+		eidx += snprintf(exp_preview + eidx, sizeof(exp_preview) - eidx, "%02x",
+		                 expected.message.tx_data.pdu_payload[i]);
+		if (i != preview - 1 && eidx < (int)sizeof(exp_preview) - 1) {
+			exp_preview[eidx++] = ' ';
+			exp_preview[eidx] = '\0';
 		}
-	dect_phy_pdu_utils_ping_print(&pdu);
+		ridx += snprintf(rcv_preview + ridx, sizeof(rcv_preview) - ridx, "%02x",
+		                 pdu.message.tx_data.pdu_payload[i]);
+		if (i != preview - 1 && ridx < (int)sizeof(rcv_preview) - 1) {
+			rcv_preview[ridx++] = ' ';
+			rcv_preview[ridx] = '\0';
+		}
+	}
+	desh_print("expected (first %d bytes hex): %s", preview, exp_preview);
+	desh_print("received (first %d bytes hex): %s", preview, rcv_preview);
+
+	/* Compare only the actual payload length (params->data_length) */
+	pdu.message.tx_data.ber = calculate_ber(pdu.message.tx_data.pdu_payload,
+	                                       expected.message.tx_data.pdu_payload,
+	                                       params->data_length); /* only PDU is checked because PCC error == 0 */
+
+	
+	return pdu.message.tx_data.ber;
 }
 
 static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params)
 {
-	desh_print("PDC data received, no errors");
+	//desh_print("PDC data received, no errors");
 	dect_phy_ping_pdu_t pdu;
 	int ret;
 
@@ -2166,7 +2197,6 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		desh_error("dect_phy_ping_pdu_decode failed: %d", ret);
 		return -EBADMSG;
 	}
-	dect_phy_pdu_utils_ping_print(&pdu);
 	ping_data.rx_metrics.rx_pdu_expected_rssi = pdu.header.pwr_ctrl_expected_rssi_level_dbm;
 	ping_data.rx_metrics.total_packets++;
 
@@ -2192,15 +2222,9 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		ping_data.server_data.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		ping_data.server_data.rx_last_tx_id = pdu.header.transmitter_id;
 		ping_data.server_data.rx_last_data_received = k_uptime_get();
-		// BER is 0 because PCC error is 0
+		// BER is 0 because PCC&&PDC error is 0
 		pdu.message.tx_data.ber = 0;
-		if(ping_data.rx_metrics.total_packets == 1){
-			ping_data.rx_metrics.ber = 0;
-			ping_data.rx_metrics.per = 0;}
-		else{
-			ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;
-			ping_data.rx_metrics.ber = ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) /(ping_data.rx_metrics.total_packets);
-		}
+		
 		ret = dect_phy_ping_server_ping_resp_tx(params, &pdu);
 		if (ret) {
 			desh_error("Cannot send ping response: err %d", ret);
@@ -2237,8 +2261,8 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 				sprintf(tmp_str, "RTT: not known");
 			}
 
-			desh_print("ping response for seq_nbr %d (%s)", pdu.message.tx_data.seq_nbr,
-				   tmp_str);
+			/*desh_print("ping response for seq_nbr %d (%s)", pdu.message.tx_data.seq_nbr,
+				   tmp_str);*/
 			ping_data.client_data.tx_ping_resp_received = true;
 
 		} else {
@@ -2254,7 +2278,7 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		if (pdu.header.transmitter_id == ping_data.server_data.rx_last_tx_id) {
 			desh_print("PING_RESULT_REQ received from tx id %d",
 				pdu.header.transmitter_id);
-			dect_phy_ping_server_report_local_and_tx_results();
+			//dect_phy_ping_server_report_local_and_tx_results();
 		} else if (pdu.header.transmitter_id ==
 				ping_data.rx_metrics.rx_last_tx_id_from_pcc) {
 			desh_warn("PING_RESULT_REQ received from tx id %d - but no perf "
@@ -2266,7 +2290,7 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 				  ping_data.rx_metrics.rx_last_tx_id_from_pcc);
 			ping_data.server_data.rx_last_tx_id =
 				ping_data.rx_metrics.rx_last_tx_id_from_pcc;
-			dect_phy_ping_server_report_local_and_tx_results();
+			//dect_phy_ping_server_report_local_and_tx_results();
 		} else {
 			desh_warn("PING_RESULTS_REQ received from tx id %d - but no ping "
 				  "session with it (last seen tx id %d)",
@@ -2274,13 +2298,16 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		}
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PING_RESULTS_RESP) {
 		ping_data.client_data.tx_results_from_server_requested = false;
-		desh_print("Server results received.");
+		//desh_print("Server results received.");
 		dect_phy_ping_cmd_done();
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PING_HARQ_FEEDBACK) {
 		desh_print("HARQ feedback received.");
 	} else {
 		desh_warn("type %d", pdu.header.message_type);
 	}
+	
+desh_print("PDC,%d,%d,%d", params->mcs, params->snr, 0);
+
 	return 0;
 }
 
@@ -2308,15 +2335,44 @@ static int dect_phy_ping_init(void)
 
 
 
-int calculate_ber(const uint8_t *received, const uint8_t *expected, size_t len_bytes) { 
+static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_t len_bytes)
+{
+	/* Avoid treating binary buffers as C-strings. Print a short hex preview and lengths. */
+	int to_print = (len_bytes > 16) ? 16 : (int)len_bytes;
+	char preview[3 * 16 + 1] = {0};
+	int idx = 0;
+	for (int i = 0; i < to_print; i++) {
+		idx += snprintf(preview + idx, sizeof(preview) - idx, "%02x", received[i]);
+		if (i != to_print - 1) {
+			if (idx < (int)sizeof(preview) - 1) {
+				preview[idx++] = ' ';
+				preview[idx] = '\0';
+			}
+		}
+	}
+	desh_print("calculate_ber: len_bytes=%d, preview(received first %d bytes)='%s'", (int)len_bytes,
+			   to_print, preview);
+
 	int error_bits = 0;
-	int total_bits = len_bytes * 8;
-	
+	int total_bits = (int)len_bytes * 8;
+
 	for (size_t i = 0; i < len_bytes; i++) {
 		uint8_t diff = received[i] ^ expected[i];
 		for (int b = 0; b < 8; b++) {
-			 if (diff & (1 << b)) error_bits++; }
-	 }
-	  return (error_bits * 100) / total_bits; }
+			if (diff & (1 << b)) {
+				error_bits++;
+			}
+		}
+	}
+
+	desh_print("error bits: %d, total bits: %d, len_bytes: %d", error_bits, total_bits,
+			   (int)len_bytes);
+
+	if (total_bits == 0) {
+		return 0;
+	}
+
+	return (error_bits * 100) / total_bits;
+}
 
 SYS_INIT(dect_phy_ping_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

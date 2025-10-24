@@ -1858,6 +1858,96 @@ show_usage:
 	desh_print_no_format(dect_phy_sett_cmd_usage_str);
 	return 0;
 }
+/* Periodic ping server function */
+static void dect_ping_server(const struct shell *shell, size_t argc, char **argv)
+{
+    struct dect_phy_ping_params params;
+    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+
+    /* Set defaults */
+    params.channel = 1677;
+    params.timeout_msecs = 1500;
+    params.interval_secs = 2;
+    params.ping_count = 10;
+    params.role = DECT_PHY_COMMON_ROLE_SERVER;
+    params.slot_count = 2;
+    params.destination_transmitter_id = DECT_PHY_DEFAULT_TRANSMITTER_LONG_RD_ID;
+    params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
+    params.tx_power_dbm = -40;
+    params.tx_mcs = current_settings->tx.mcs;
+    params.tx_lbt_period_symbols = 0;
+    params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
+    params.debugs = true;
+    params.rssi_reporting_enabled = false;
+    params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
+    params.pwr_ctrl_automatic = false;
+    params.use_harq = false;
+
+    /* Start one ping operation */
+    int ret = dect_phy_ctrl_ping_cmd(&params);
+    if (ret) {
+        desh_error("Cannot start ping server, ret: %d", ret);
+        return;
+    }
+    
+    /* Sleep for 5 seconds */
+    k_sleep(K_MSEC(5000));
+    
+    /* Stop the ping operation */
+    dect_phy_ctrl_ping_cmd_stop();
+}
+
+/* Periodic ping client function with MCS */
+static void dect_ping_client(const struct shell *shell, size_t argc, char **argv)
+{
+    struct dect_phy_ping_params params;
+    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+
+    if (argc != 2) {
+        desh_error("Usage: dect ping_client <mcs>  (mcs: 1-4)");
+        return;
+    }
+
+    int mcs = atoi(argv[1]);
+    if (mcs < 1 || mcs > 4) {
+        desh_error("MCS must be between 1 and 4");
+        return;
+    }
+
+    /* Set defaults */
+    params.channel = 1665;
+    params.timeout_msecs = 1500;
+    params.interval_secs = 2;
+    params.ping_count = 3;  /* Send 3 ping packets */
+    params.role = DECT_PHY_COMMON_ROLE_CLIENT;
+    params.slot_count = 1;
+    params.destination_transmitter_id = DECT_PHY_DEFAULT_TRANSMITTER_LONG_RD_ID;
+    params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
+    params.tx_power_dbm = current_settings->tx.power_dbm;
+    params.tx_mcs = mcs;  /* Use provided MCS value */
+    params.tx_lbt_period_symbols = 0;
+    params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
+    params.debugs = true;
+    params.rssi_reporting_enabled = false;
+    params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
+    params.pwr_ctrl_automatic = false;
+    params.use_harq = false;
+	while(1){
+		/* Start one ping operation */
+    int ret = dect_phy_ctrl_ping_cmd(&params);
+    if (ret) {
+        desh_error("Cannot start ping client, ret: %d", ret);
+        return;
+    }
+
+    /* Sleep for 5 seconds */
+    k_sleep(K_MSEC(5000));
+	}
+    
+
+}
+
+
 
 /**************************************************************************************************/
 
@@ -1916,7 +2006,21 @@ SHELL_SUBCMD_ADD((dect), rf_tool, NULL,
 		 " 4.4 (Conformance requirements for receiver).\n"
 		 " Usage: dect rf_tool [options: see: dect rf_tool -h]",
 		 dect_phy_rf_tool_cmd, 1, 35);
+
+
+SHELL_SUBCMD_ADD((dect), ping_server, NULL,
+         "Start periodic ping server (10s period).\n"
+         " Usage: dect ping_server",
+         dect_ping_server, 1, 0);
+
+SHELL_SUBCMD_ADD((dect), ping_client, NULL,
+         "Start periodic ping client.\n"
+         " Usage: dect ping_client <mcs> (mcs: 1-4)",
+         dect_ping_client, 1, 1);
+
+		 
 SHELL_SUBCMD_ADD((dect), ping, NULL,
 		 "dect ping command.\n"
 		 " Usage: dect ping [options: see: dect ping -h]",
 		 dect_phy_ping_cmd, 1, 35);
+

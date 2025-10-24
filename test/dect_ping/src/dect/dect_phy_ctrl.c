@@ -429,7 +429,7 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 			dect_phy_ctrl_msgq_non_data_op_add(DECT_PHY_CTRL_OP_DEBUG_ON);
 
 			dect_phy_ctrl_phy_handlers_init();
-			desh_print("ping command done.");
+			//desh_print("ping command done.");
 			break;
 		}
 		case DECT_PHY_CTRL_OP_RF_TOOL_CMD_DONE: {
@@ -918,9 +918,8 @@ static void dect_phy_ctrl_mdm_on_pdc_crc_failure_cb(
 {
 	struct dect_phy_common_op_pdc_crc_fail_params pdc_crc_fail_params = {
 		.time = *time,
-		.crc_failure = *evt,
-		.error_packets = *evt,
-		.ber = *evt,
+		.crc_failure = *evt
+		
 	};
 
 	dect_phy_ctrl_msgq_data_op_add(DECT_PHY_CTRL_OP_PHY_API_MDM_RX_PDC_CRC_ERROR,
