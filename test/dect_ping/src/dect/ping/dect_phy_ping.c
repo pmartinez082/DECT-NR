@@ -1739,7 +1739,7 @@ static void dect_phy_ping_thread_fn(void)
 			}
 			if (cmd_params->debugs) {
 				// header fields: channel, mcs, snr, ber
-				desh_print("PDC,%d,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr, ber);
+				desh_print("PDC_err,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr);
 				/*
 				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %%%d",
 					  params->time, params->crc_failure.snr,
@@ -2138,43 +2138,26 @@ int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *
 	ping_data.rx_metrics.error_packets++;
 	ping_data.rx_metrics.total_packets++;
 	//desh_print("total packets: %d, error packets: %d", ping_data.rx_metrics.total_packets, ping_data.rx_metrics.error_packets);
-	dect_phy_ping_pdu_t pdu, expected;
+	dect_phy_ping_pdu_t pdu;
+	
+	// cast payload into pdu
 	int ret = dect_phy_ping_pdu_decode(&pdu, (const uint8_t *)params->data);
 	if (ret) {
 		ping_data.rx_metrics.rx_decode_error++;
 		desh_error("dect_phy_ping_pdu_decode failed: %d", ret);
-		return -1;
+		return -EBADMSG;
 	}
-	dect_common_utils_fill_with_repeating_pattern(expected.message.tx_data.pdu_payload, params->data_length);
-	desh_print("expected payload and received payload compared for BER calculation");
 
-	/* Print short hex previews instead of treating payloads as strings */
-	int preview = (params->data_length > 16) ? 16 : params->data_length;
-	char exp_preview[3 * 16 + 1] = {0};
-	char rcv_preview[3 * 16 + 1] = {0};
-	int eidx = 0;
-	int ridx = 0;
-	for (int i = 0; i < preview; i++) {
-		eidx += snprintf(exp_preview + eidx, sizeof(exp_preview) - eidx, "%02x",
-		                 expected.message.tx_data.pdu_payload[i]);
-		if (i != preview - 1 && eidx < (int)sizeof(exp_preview) - 1) {
-			exp_preview[eidx++] = ' ';
-			exp_preview[eidx] = '\0';
-		}
-		ridx += snprintf(rcv_preview + ridx, sizeof(rcv_preview) - ridx, "%02x",
-		                 pdu.message.tx_data.pdu_payload[i]);
-		if (i != preview - 1 && ridx < (int)sizeof(rcv_preview) - 1) {
-			rcv_preview[ridx++] = ' ';
-			rcv_preview[ridx] = '\0';
-		}
-	}
-	desh_print("expected (first %d bytes hex): %s", preview, exp_preview);
-	desh_print("received (first %d bytes hex): %s", preview, rcv_preview);
+	
+	char exp_payload[DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN];
+	
+	dect_common_utils_fill_with_repeating_pattern(&exp_payload, params->data_length);
+	
 
-	/* Compare only the actual payload length (params->data_length) */
+	
 	pdu.message.tx_data.ber = calculate_ber(pdu.message.tx_data.pdu_payload,
-	                                       expected.message.tx_data.pdu_payload,
-	                                       params->data_length); /* only PDU is checked because PCC error == 0 */
+	                                      exp_payload,
+	                                       pdu.message.tx_data.payload_length); /* only PDU is checked because PCC error == 0 */
 
 	
 	return pdu.message.tx_data.ber;
@@ -2306,7 +2289,7 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		desh_warn("type %d", pdu.header.message_type);
 	}
 	
-desh_print("PDC,%d,%d,%d", params->mcs, params->snr, 0);
+desh_print("PDC,%d,%d", params->mcs, params->snr);
 
 	return 0;
 }
@@ -2337,6 +2320,7 @@ static int dect_phy_ping_init(void)
 
 static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_t len_bytes)
 {
+	desh_print("Expected payload: %s\n LEN: %d", expected, len_bytes);
 	/* Avoid treating binary buffers as C-strings. Print a short hex preview and lengths. */
 	int to_print = (len_bytes > 16) ? 16 : (int)len_bytes;
 	char preview[3 * 16 + 1] = {0};
