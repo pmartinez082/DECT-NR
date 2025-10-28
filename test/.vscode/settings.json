@@ -3,7 +3,8 @@
         "${workspaceFolder}\\transmitter",
         "${workspaceFolder}\\receiver",
         "${workspaceFolder}\\test_perf",
-        "${workspaceFolder}\\dect_shell"
+        "${workspaceFolder}\\dect_shell",
+        "${workspaceFolder}\\dect_ping"
     ],
     "files.associations": {
         "*.dbclient-js": "javascript",

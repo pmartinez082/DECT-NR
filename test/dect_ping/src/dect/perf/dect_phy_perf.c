@@ -1890,12 +1890,12 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 
 				perf_data.rx_metrics.rx_out_of_seq_count++;
 				if (cmd_params->debugs) {
-					desh_warn("Out of seq in RX: rx_out_of_seq_count %d, "
+				/*	desh_warn("Out of seq in RX: rx_out_of_seq_count %d, "
 						  "pdu.seq_nbr %d, perf_data.rx_last_seq_nbr "
 						  "%d",
 						  perf_data.rx_metrics.rx_out_of_seq_count,
 						  pdu.message.tx_data.seq_nbr,
-						  perf_data.rx_metrics.rx_last_seq_nbr);
+						  perf_data.rx_metrics.rx_last_seq_nbr);*/
 				}
 			}
 		}

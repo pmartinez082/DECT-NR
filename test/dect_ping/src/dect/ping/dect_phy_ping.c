@@ -1686,7 +1686,7 @@ static void dect_phy_ping_thread_fn(void)
 			break;
 		}
 		case DECT_PHY_PING_EVENT_SERVER_REPORT: {
-			dect_phy_ping_server_report_local_and_tx_results();
+		//	dect_phy_ping_server_report_local_and_tx_results();
 			break;
 		}
 		case DECT_PHY_PING_EVENT_RX_PCC_CRC_ERROR: {
@@ -1713,11 +1713,8 @@ static void dect_phy_ping_thread_fn(void)
 				if (since_last_print_ms >= 100) {
 					ping_data.rx_metrics.rx_last_pcc_error_print_zticks =
 						z_ticks_last_pcc_error_print;
-					desh_warn("PING: RX PCC CRC error (time %llu): SNR %d, "
-						  "RSSI-2 %d (%d dBm)",
-						  params->time, params->crc_failure.snr,
-						  params->crc_failure.rssi_2,
-						  (params->crc_failure.rssi_2 / 2));
+					desh_print("PCC_err,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr);
+						 
 				}
 			}
 			break;
@@ -1739,7 +1736,7 @@ static void dect_phy_ping_thread_fn(void)
 			}
 			if (cmd_params->debugs) {
 				// header fields: channel, mcs, snr, ber
-				desh_print("PDC_err,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr);
+				desh_print("PDC_err,%d,%d", 3, params->crc_failure.snr);
 				/*
 				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %%%d",
 					  params->time, params->crc_failure.snr,
@@ -1818,7 +1815,7 @@ static void dect_phy_ping_thread_fn(void)
 
 				// CSV header fields: channel, mcs, snr, ber
 				struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
-				desh_print("PCC,1,%d,%d",  params->pcc_status.snr, 0);
+				desh_print("PCC,1,%d",  params->pcc_status.snr);
 			}
 
 			/* Handle HARQ feedback */
@@ -2099,7 +2096,7 @@ void dect_phy_ping_cmd_stop(void)
 
 void dect_phy_ping_rx_on_pcc_crc_failure(void)
 {
-	desh_print("PCC CRC error received");
+	//desh_print("PCC CRC error received");
 	if (!ping_data.on_going) {
 		desh_error("receiving ping data but ping is not running.");
 		return;
@@ -2129,7 +2126,7 @@ void dect_phy_ping_rx_on_pcc_crc_failure(void)
 
 int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
 {
-	desh_print("PDC CRC error received");
+	//desh_print("PDC CRC error received");
 	if (!ping_data.on_going) {
 		desh_error("receiving ping data but ping is not running.");
 		return -1;
@@ -2192,12 +2189,12 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 			if (pdu.message.tx_data.seq_nbr !=
 			    (ping_data.server_data.rx_last_seq_nbr + 1)) {
 				ping_data.rx_metrics.rx_out_of_seq_count++;
-				desh_warn("Out of seq in RX: rx_out_of_seq_count %d, "
+				/*desh_warn("Out of seq in RX: rx_out_of_seq_count %d, "
 					  "pdu.seq_nbr %d, "
 					  "ping_data.server_data.rx_last_seq_nbr %d",
 					  ping_data.rx_metrics.rx_out_of_seq_count,
 					  pdu.message.tx_data.seq_nbr,
-					  ping_data.server_data.rx_last_seq_nbr);
+					  ping_data.server_data.rx_last_seq_nbr);*/
 			}
 		}
 		ping_data.rx_metrics.rx_total_data_amount += params->data_length;
@@ -2320,7 +2317,7 @@ static int dect_phy_ping_init(void)
 
 static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_t len_bytes)
 {
-	desh_print("Expected payload: %s\n LEN: %d", expected, len_bytes);
+	//desh_print("Expected payload: %s\n LEN: %d", expected, len_bytes);
 	/* Avoid treating binary buffers as C-strings. Print a short hex preview and lengths. */
 	int to_print = (len_bytes > 16) ? 16 : (int)len_bytes;
 	char preview[3 * 16 + 1] = {0};
@@ -2334,8 +2331,8 @@ static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_
 			}
 		}
 	}
-	desh_print("calculate_ber: len_bytes=%d, preview(received first %d bytes)='%s'", (int)len_bytes,
-			   to_print, preview);
+	/*desh_print("calculate_ber: len_bytes=%d, preview(received first %d bytes)='%s'", (int)len_bytes,
+			   to_print, preview);*/
 
 	int error_bits = 0;
 	int total_bits = (int)len_bytes * 8;
@@ -2349,8 +2346,8 @@ static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_
 		}
 	}
 
-	desh_print("error bits: %d, total bits: %d, len_bytes: %d", error_bits, total_bits,
-			   (int)len_bytes);
+	/*desh_print("error bits: %d, total bits: %d, len_bytes: %d", error_bits, total_bits,
+			   (int)len_bytes);*/
 
 	if (total_bits == 0) {
 		return 0;
