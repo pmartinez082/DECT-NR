@@ -1,5 +1,4 @@
 # DECT-NR
-Got it — here’s your README fully formatted and ready to drop into a `README.md` file:
 
 ````{"variant":"standard","title":"README.md for DECT Ping Instructions","id":"21640"}
 # DECT Ping Instructions
