@@ -1,6 +1,6 @@
 # DECT-NR
 
-````{"variant":"standard","title":"README.md for DECT Ping Instructions","id":"21640"}
+
 # DECT Ping Instructions
 
 ## Overview
