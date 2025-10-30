@@ -1736,7 +1736,7 @@ static void dect_phy_ping_thread_fn(void)
 			}
 			if (cmd_params->debugs) {
 				// header fields: channel, mcs, snr, ber
-				desh_print("PDC_err,%d,%d", 3, params->crc_failure.snr);
+				desh_print("PDC_err,%d,%d", 4, params->crc_failure.snr);
 				/*
 				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %%%d",
 					  params->time, params->crc_failure.snr,

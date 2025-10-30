@@ -44,6 +44,7 @@ plt.ylabel('Packet Error Rate (PER)')
 plt.title('PER vs SNR per MCS')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')  # <<< Make y-axis logarithmic
+
 plt.legend(title='MCS')
 plt.tight_layout()
 
