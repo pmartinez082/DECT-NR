@@ -2,5 +2,8 @@
     "files.associations": {
         "*.dbclient-js": "javascript",
         "limits": "c"
-    }
+    },
+    "nrf-connect.applications": [
+        "${workspaceFolder}"
+    ]
 }
