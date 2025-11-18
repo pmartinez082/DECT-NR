@@ -1,0 +1,19 @@
+{
+  "toolchainPath": "c:\\ncs\\toolchains\\0b393f9e1b",
+  "sdkPath": "c:\\ncs\\v3.0.0",
+  "board": "nrf9151dk/nrf9151/ns",
+  "boardDir": "c:\\ncs\\v3.0.0\\zephyr\\boards\\nordic\\nrf9151dk",
+  "boardDirs": [
+    "c:\\ncs\\v3.0.0\\zephyr\\boards\\nordic\\nrf9151dk"
+  ],
+  "optimizations": "none",
+  "cmakeArgs": [],
+  "confFiles": [
+    "prj.conf"
+  ],
+  "buildDirectory": "build",
+  "kconfigFragments": [],
+  "snippets": [],
+  "dtcOverlays": [],
+  "extraDtcOverlays": []
+}

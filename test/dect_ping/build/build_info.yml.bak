@@ -1,0 +1,22 @@
+cmake:
+  board:
+    name: nrf9151dk
+    path:
+     - C:/ncs/v3.0.0/zephyr/boards/nordic/nrf9151dk
+    qualifiers: nrf9151/ns
+    revision: 
+  images:
+   - name: dect_ping
+     source-dir: C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping
+     type: MAIN
+  kconfig:
+    files:
+     - C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/empty.conf
+     - C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/empty.conf
+    user-files:
+     - C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/empty.conf
+version: 0.1.0
+west:
+  command: C:\ncs\toolchains\0b393f9e1b\opt\bin\Scripts\west build --build-dir c:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build c:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping --pristine --board nrf9151dk/nrf9151/ns -- -DCONF_FILE=prj.conf
+  topdir: c:\ncs\v3.0.0
+  version: 1.2.0

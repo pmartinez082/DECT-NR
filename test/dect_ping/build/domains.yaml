@@ -1,0 +1,7 @@
+default: dect_ping
+build_dir: C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build
+domains:
+  - name: dect_ping
+    build_dir: C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping
+flash_order:
+  - dect_ping

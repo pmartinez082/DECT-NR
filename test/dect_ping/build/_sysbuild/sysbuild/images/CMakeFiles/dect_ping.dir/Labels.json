@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/CMakeFiles/dect_ping"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/CMakeFiles/dect_ping.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/CMakeFiles/dect_ping-complete.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-build.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-configure.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-download.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-install.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-mkdir.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-patch.rule"
+		},
+		{
+			"file" : "C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/_sysbuild/sysbuild/images/dect_ping-prefix/src/dect_ping-stamp/dect_ping-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"dect_ping"
+		],
+		"name" : "dect_ping"
+	}
+}

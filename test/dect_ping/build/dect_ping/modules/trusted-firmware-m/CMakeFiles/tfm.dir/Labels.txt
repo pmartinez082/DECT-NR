@@ -1,0 +1,13 @@
+# Target labels
+ tfm
+# Source files and their labels
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/CMakeFiles/tfm
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/CMakeFiles/tfm.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/CMakeFiles/tfm-complete.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-build.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-configure.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-download.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-install.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-mkdir.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-patch.rule
+C:/Users/pmupm/Desktop/praktikak/DECT/test/dect_ping/build/dect_ping/modules/trusted-firmware-m/tfm-prefix/src/tfm-stamp/tfm-update.rule
