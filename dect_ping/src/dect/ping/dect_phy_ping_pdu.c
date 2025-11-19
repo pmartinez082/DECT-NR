@@ -78,7 +78,7 @@ int dect_phy_ping_pdu_decode(dect_phy_ping_pdu_t *p_target, const uint8_t *p_dat
 void dect_phy_pdu_utils_ping_print( dect_phy_ping_pdu_t *ping_pdu)
 {
 // print in CSV format
-// header fields: channel, mcs, snr, ber
+// header fields: channel, mcs, snr
 
 	
 	
@@ -105,7 +105,7 @@ void dect_phy_pdu_utils_ping_print( dect_phy_ping_pdu_t *ping_pdu)
 			sprintf(&ascii_data[i], "%c", ping_pdu->message.tx_data.pdu_payload[i]);
 		}
 		ascii_data[i + 1] = '\0';
-		desh_print("  BER:	            	%d", ping_pdu->message.tx_data.ber);
+		
 
 		desh_print("  payload data: %s", ascii_data);
 		

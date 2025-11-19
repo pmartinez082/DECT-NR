@@ -44,7 +44,6 @@ typedef struct {
 	uint16_t seq_nbr;
 	uint16_t payload_length;
 	uint8_t pdu_payload[DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN];
-	uint16_t ber;
 } dect_phy_ping_pdu_tx_data;
 
 typedef union {

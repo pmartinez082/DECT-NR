@@ -82,7 +82,6 @@ struct dect_phy_ping_rx_metrics {
 
 	int64_t rx_last_pcc_error_print_zticks;
 
-	uint32_t ber;
 	uint32_t per;
 	int error_packets;
 	int total_packets;
@@ -167,7 +166,7 @@ static struct dect_phy_ping_harq_tx_process_info
 
 static void dect_phy_ping_rx_on_pcc_crc_failure(void);
 static int calculate_ber(const uint8_t *p_received_data, const uint8_t *p_expected_data, size_t data_length);
-static int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params);
+static void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params);
 static int dect_phy_ping_msgq_non_data_op_add(uint16_t event_id);
 static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params);
 
@@ -208,7 +207,7 @@ static void dect_phy_ping_rx_metrics_reset(struct dect_phy_ping_params *params)
 	ping_data.rx_metrics.total_packets = 0;
 	ping_data.rx_metrics.error_packets = 0;
 	ping_data.rx_metrics.per = 0;
-	ping_data.rx_metrics.ber = 0;
+
 
 }
 
@@ -1452,7 +1451,7 @@ static void dect_phy_ping_server_report_local_and_tx_results(void)
 	sprintf(results_str + strlen(results_str), "  rx: min SNR %d, max SNR %d\n",
 		ping_data.rx_metrics.rx_snr_low, ping_data.rx_metrics.rx_snr_high);
 	sprintf(results_str + strlen(results_str), "  rx: PER                      %d\n", ping_data.rx_metrics.per);
-	sprintf(results_str + strlen(results_str), "  rx: BER                      %d\n", ping_data.rx_metrics.ber);
+	
 
 	desh_print("%s", results_str);
 
@@ -1603,6 +1602,7 @@ void dect_phy_ping_mdm_op_completed(
 				 * quit.
 				 */
 				if (ping_data.cmd_params.role == DECT_PHY_COMMON_ROLE_SERVER &&
+
 				    ping_data.server_data.on_going_rx_count == 0 &&
 				    z_delta_ms > 500) {
 					struct dect_phy_ping_params copy_params =
@@ -1713,42 +1713,44 @@ static void dect_phy_ping_thread_fn(void)
 				if (since_last_print_ms >= 100) {
 					ping_data.rx_metrics.rx_last_pcc_error_print_zticks =
 						z_ticks_last_pcc_error_print;
-					desh_print("PCC_err,%d,%d", cmd_params-> tx_mcs, params->crc_failure.snr);
+					desh_print("PCC_err,%d,%d", ping_data.rx_metrics.rx_last_pcc_mcs, params->crc_failure.snr);
 						 
 				}
 			}
 			break;
 		}
 		case DECT_PHY_PING_EVENT_RX_PDC_CRC_ERROR: {
-			struct dect_phy_common_op_pdc_crc_fail_params *params =
-	(struct dect_phy_common_op_pdc_crc_fail_params *)event.data;
+            struct dect_phy_common_op_pdc_crc_fail_params *params =
+    (struct dect_phy_common_op_pdc_crc_fail_params *)event.data;
 
-			struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
-						struct dect_phy_data_rcv_common_params rcv_params = {
-				.data_length = params->data_length,
-				.data = params->data,
-			};
-			int ber  = 0;
-			if (ping_data.on_going) {
-				ber =dect_phy_ping_rx_on_pdc_crc_failure(&rcv_params);
-				
+            struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
+                        struct dect_phy_data_rcv_common_params rcv_params = {
+                .data_length = params->data_length,
+                .data = params->data,
+            };
+            
+            if (ping_data.on_going) {
+                dect_phy_ping_rx_on_pdc_crc_failure(&rcv_params);
+                
 
-			}
-			if (cmd_params->debugs) {
-				// header fields: channel, mcs, snr, ber
-				desh_print("PDC_err,%d,%d", 4, params->crc_failure.snr);
-				/*
-				desh_warn("PING: RX PDC CRC error (time %llu): SNR %d, RSSI-2 %d (%d dBm), BER %%%d",
-					  params->time, params->crc_failure.snr,
-					  params->crc_failure.rssi_2,
-					  (params->crc_failure.rssi_2 / 2),
-					  ber
-					);
-				*/
-				
-			}
-			break;
-		}
+            }
+            if (cmd_params->debugs) {
+                // header fields: channel, mcs, snr, ber
+				/* Prefer the client-provided tx_mcs when running as client.
+				 * When running as server, use the last PCC-observed MCS from the client. */
+				int mcs_to_print =0;
+				if (ping_data.on_going) {
+					if (ping_data.cmd_params.role == DECT_PHY_COMMON_ROLE_CLIENT) {
+						mcs_to_print = ping_data.cmd_params.tx_mcs;
+					} else if (ping_data.cmd_params.role == DECT_PHY_COMMON_ROLE_SERVER) {
+						mcs_to_print = ping_data.rx_metrics.rx_last_pcc_mcs;
+					}
+				}
+				desh_print("PDC_err,%d,%d", mcs_to_print, params->crc_failure.snr);
+                
+            }
+            break;
+        }
 		case DECT_PHY_PING_EVENT_RX_PCC: {
 			struct dect_phy_common_op_pcc_rcv_params *params =
 				(struct dect_phy_common_op_pcc_rcv_params *)event.data;
@@ -1814,8 +1816,8 @@ static void dect_phy_ping_thread_fn(void)
 					   phy_h->packet_length, phy_h->df_mcs, pcc_rx_pwr_dbm);*/
 
 				// CSV header fields: channel, mcs, snr, ber
-				struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
-				desh_print("PCC,1,%d",  params->pcc_status.snr);
+			
+				desh_print("PCC,%d,%d", ping_data.rx_metrics.rx_last_pcc_mcs, params->pcc_status.snr);
 			}
 
 			/* Handle HARQ feedback */
@@ -1900,7 +1902,7 @@ static void dect_phy_ping_thread_fn(void)
 				   p_rx_status->snr, p_rx_status->rssi_2, rssi_level,
 				   params->data_length);*/
 
-			// CSV header fields: channel, mcs, snr, ber
+		
 			struct dect_phy_ping_params *cmd_params = &(ping_data.cmd_params);
 		//	desh_print("PDC,%d,%d,%d\n", cmd_params-> tx_mcs, p_rx_status->snr, 0);
 			if (params->data_length) {
@@ -2106,25 +2108,13 @@ void dect_phy_ping_rx_on_pcc_crc_failure(void)
 	
 	ping_data.rx_metrics.total_packets++;
 	ping_data.rx_metrics.error_packets++;
-	dect_phy_ping_pdu_t pdu;
+	
 
 	
-	pdu.message.tx_data.ber = 100;	// Changing later
-	if (ping_data.rx_metrics.total_packets == 1)
-	{
-		ping_data.rx_metrics.ber = pdu.message.tx_data.ber;
-		
-	}
-	else{
-		ping_data.rx_metrics.ber = (ping_data.rx_metrics.ber/100*(ping_data.rx_metrics.total_packets-1) + pdu.message.tx_data.ber) *100/ (ping_data.rx_metrics.total_packets );
-
-	}
-	
-	ping_data.rx_metrics.per = (ping_data.rx_metrics.error_packets * 100) / ping_data.rx_metrics.total_packets;	
 
 }
 
-int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
+ void dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *params)
 {
 	//desh_print("PDC CRC error received");
 	if (!ping_data.on_going) {
@@ -2134,30 +2124,9 @@ int dect_phy_ping_rx_on_pdc_crc_failure(struct dect_phy_data_rcv_common_params *
 	ping_data.rx_metrics.rx_pdc_crc_error_count++;
 	ping_data.rx_metrics.error_packets++;
 	ping_data.rx_metrics.total_packets++;
-	//desh_print("total packets: %d, error packets: %d", ping_data.rx_metrics.total_packets, ping_data.rx_metrics.error_packets);
-	dect_phy_ping_pdu_t pdu;
-	
-	// cast payload into pdu
-	int ret = dect_phy_ping_pdu_decode(&pdu, (const uint8_t *)params->data);
-	if (ret) {
-		ping_data.rx_metrics.rx_decode_error++;
-		desh_error("dect_phy_ping_pdu_decode failed: %d", ret);
-		return -EBADMSG;
-	}
 
 	
-	char exp_payload[DECT_PHY_PING_TX_DATA_PDU_PAYLOAD_MAX_LEN];
-	
-	dect_common_utils_fill_with_repeating_pattern(&exp_payload, params->data_length);
-	
-
-	
-	pdu.message.tx_data.ber = calculate_ber(pdu.message.tx_data.pdu_payload,
-	                                      exp_payload,
-	                                       pdu.message.tx_data.payload_length); /* only PDU is checked because PCC error == 0 */
-
-	
-	return pdu.message.tx_data.ber;
+	return;
 }
 
 static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_params *params)
@@ -2202,8 +2171,7 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		ping_data.server_data.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		ping_data.server_data.rx_last_tx_id = pdu.header.transmitter_id;
 		ping_data.server_data.rx_last_data_received = k_uptime_get();
-		// BER is 0 because PCC&&PDC error is 0
-		pdu.message.tx_data.ber = 0;
+
 		
 		ret = dect_phy_ping_server_ping_resp_tx(params, &pdu);
 		if (ret) {
@@ -2331,8 +2299,7 @@ static int calculate_ber(const uint8_t *received, const uint8_t *expected, size_
 			}
 		}
 	}
-	/*desh_print("calculate_ber: len_bytes=%d, preview(received first %d bytes)='%s'", (int)len_bytes,
-			   to_print, preview);*/
+	
 
 	int error_bits = 0;
 	int total_bits = (int)len_bytes * 8;

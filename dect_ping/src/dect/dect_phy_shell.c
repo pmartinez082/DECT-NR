@@ -368,6 +368,8 @@ show_usage:
 	return 0;
 }
 
+
+
 /**************************************************************************************************/
 
 /* The following do not have short options:: */
@@ -732,49 +734,18 @@ show_usage:
 /**************************************************************************************************/
 
 static const char dect_phy_ping_cmd_usage_str[] =
-	"Usage: dect ping [stop] | [<server>|<client> [server_options]|[client_options] | menu]\n"
-	"Note: make sure that accessed channel is free by using \"dect rssi_scan\" -command.\n"
+	"Usage: dect ping [stop] | dect ping_server [options] | dect ping_client [options]\n"
 	"\n"
 	"Options:\n"
-	"  -c, --client,              Client role.\n"
-	"  -s, --server,              Server role.\n"
-	"      --channel <int>,       Channel. Default 1665.\n"
-	"  -t, --c_timeout <int>,     Ping timeout in milliseconds. Default: 1500 msecs.\n"
-	"      --c_count <int>,       The number of times to send the ping request. Default: 5.\n"
-	"  -l, --c_slots <int>,       Payload length (in slots) to be sent. Default: 1.\n"
-	"  -i, --c_interval <int>,    Interval between successive packet transmissions\n"
-	"                             in seconds. Default: 2 secs.\n"
-	"      --c_tx_mcs <int>,      Set client TX MCS. Default: from common tx settings.\n"
-	"      --c_tx_pwr <int>,      TX power (dBm),\n"
+	"  client,              Client role.\n"
+	"  server,              Server role.\n"
+	"      --tx_mcs <int>,      Set client TX MCS. Default: from common tx settings.\n"
+	"      --tx_pwr <int>,      TX power (dBm),\n"
 	"                             [-40,-30,-20,-16,-12,-8,-4,0,4,7,10,13,16,19,21,23].\n"
 	"                             See supported max for the used band by using\n"
 	"                             \"dect status\" -command output.\n"
 	"                             Default: from common tx settings.\n"
-	"      --c_tx_lbt_period <cnt>,  Listen Before Talk (LBT) period (symbol count).\n"
-	"                                Zero value disables LBT (default).\n"
-	"                                Valid range for symbol count: 2-110.\n"
-	"      --c_tx_lbt_busy_th <dbm>, LBT busy RSSI threshold (dBm). Valid only when LBT\n"
-	"                                is enabled. Default from RSSI busy threshold setting.\n"
-	"      --s_tx_id <id>,        Target server transmitter id (default: 38).\n"
-	"                             Note: lowest 16bits of transmitter id (long RD ID).\n"
-	"  -e  --rx_exp_rssi_level <int>, Set expected RSSI level on RX (dBm).\n"
-	"                                 Default: from common rx settings.\n"
-	"  -m, --rssi_meas,           If set, RSSI measurements are enabled. Default: disabled.\n"
-	"                             When enabled, RSSI measurements are printed after every 200\n"
-	"                             measurements and after receiving PING_REQ/RESP\n"
-	"                             (i.e. measurements are done before those).\n"
-	"      --tx_pwr_ctrl_auto,    If given, sending side of the ping PDU tries to adjust TX\n"
-	"                             power according to peer's expected RX RSSI level\n"
-	"                             (informed in peer's PDU). Starting point is c_tx_pwr\n"
-	"                             in a client side, and as received in server side.\n"
-	"                             As a default, functionality is disabled.\n"
-	"      --tx_pwr_ctrl_pdu_rx_exp_rssi_level <dbm>, Set expected RX RSSI level (dBm)\n"
-	"                                                 announced in a ping PDU.\n"
-	"                                                 Has impact only if tx_pwr_ctrl_auto\n"
-	"                                                 is enabled.\n"
-	"                                                 Default -60 dBm.\n"
-	"For HARQ only:\n"
-	"  -a, --use_harq,            Use HARQ. Client side requests HARQ feedback for sent ping\n"
+	"  -a, --harq,	            	Use HARQ. Client side requests HARQ feedback for sent ping\n"
 	"                             requests and based on received HARQ ACK/NACK ping request\n"
 	"                             is re-sent if possible within a timeout.\n";
 
@@ -796,14 +767,14 @@ static struct option long_options_ping[] = {
 	{"client", no_argument, 0, 'c'},
 	{"server", no_argument, 0, 's'},
 	{"rssi_meas", no_argument, 0, 'm'},
-	{"use_harq", no_argument, 0, 'a'},
+	{"harq", no_argument, 0, 'a'},
 	{"channel", required_argument, 0, DECT_SHELL_PING_CHANNEL},
 	{"c_timeout", required_argument, 0, 't'},
 	{"c_count", required_argument, 0, DECT_SHELL_PING_COUNT},
 	{"c_interval", required_argument, 0, 'i'},
 	{"c_slots", required_argument, 0, 'l'},
-	{"c_tx_pwr", required_argument, 0, DECT_SHELL_PING_TX_PWR},
-	{"c_tx_mcs", required_argument, 0, DECT_SHELL_PING_TX_MCS},
+	{"tx_pwr", required_argument, 0, DECT_SHELL_PING_TX_PWR},
+	{"tx_mcs", required_argument, 0, DECT_SHELL_PING_TX_MCS},
 	{"c_tx_lbt_period", required_argument, 0, DECT_SHELL_PING_TX_LBT_PERIOD },
 	{"c_tx_lbt_busy_th", required_argument, 0, DECT_SHELL_PING_TX_LBT_RSSI_BUSY_THRESHOLD },
 	{"rx_exp_rssi_level", required_argument, 0, 'e'},
@@ -813,223 +784,152 @@ static struct option long_options_ping[] = {
 	{"tx_pwr_ctrl_auto", no_argument, 0, DECT_SHELL_PING_TX_PWR_CTRL_AUTO},
 	{0, 0, 0, 0}};
 
-/* Print a concise menu describing client/server inputs for `dect ping` */
-static void dect_phy_ping_menu_print(const struct shell *shell)
+
+
+
+static int dect_phy_ping_server_cmd(const struct shell *shell, size_t argc, char **argv)
 {
-	shell_print(shell, "DECT ping menu:\n");
-	shell_print(shell, "  Use 'dect ping client <key>=<value> ...' to run a client ping.\n");
-	shell_print(shell, "  Use 'dect ping server <key>=<value> ...' to run a server ping (listen/respond).\n");
-	shell_print(shell, "\n");
-	shell_print(shell, "Common keys (or equivalent long options --name):\n");
-	shell_print(shell, "  channel=<int>          RF channel (default: 1665)  (or --channel 1665)\n");
-	shell_print(shell, "  count=<int>            Number of ping requests to send (client) (default: 5)\n");
-	shell_print(shell, "                         (or --c_count 5)\n");
-	shell_print(shell, "  timeout=<ms>           Ping timeout in milliseconds (client) (default: 1500)\n");
-	shell_print(shell, "                         (or --c_timeout 1500)\n");
-	shell_print(shell, "  interval=<s>           Interval between pings (client) (default: 2) (or --c_interval)\n");
-	shell_print(shell, "  tx_mcs=<int>           TX MCS to use (client) (or --c_tx_mcs)\n");
-	shell_print(shell, "  tx_pwr=<dBm>          TX power (client) (or --c_tx_pwr)\n");
-	shell_print(shell, "  lbt_period=<symbols>   LBT period in symbols (0=disabled) (or --c_tx_lbt_period)\n");
-	shell_print(shell, "  expected_rssi=<dBm>    Expected RX RSSI level for receiver side (or --rx_exp_rssi_level)\n");
-	shell_print(shell, "\nExamples:\n");
-	shell_print(shell, "  dect ping client count=10 channel=1665 tx_mcs=2 tx_pwr=0\n");
-	shell_print(shell, "  dect ping server channel=1665\n");
-	shell_print(shell, "  dect ping menu    # show this menu\n");
+	struct dect_phy_ping_params params;
+	int ret;
+	int long_index = 0;
+	int opt;
 	
+
+	
+	optreset = 1;
+	optind = 1;
+
+	if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
+		desh_print("ping command stopping.");
+		dect_phy_ctrl_ping_cmd_stop();
+		return 0;
+	}
+	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+
+	/* Set defaults */
+	params.channel = 1677;
+	params.timeout_msecs = 65535;
+	params.interval_secs = 2;
+	params.ping_count = 5;
+	params.role = DECT_PHY_COMMON_ROLE_SERVER;
+	params.slot_count = 3;
+	params.destination_transmitter_id = 39;
+	params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
+	params.tx_power_dbm = current_settings->tx.power_dbm;
+	params.tx_mcs = current_settings->tx.mcs;
+	params.tx_lbt_period_symbols = 0;
+	params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
+	params.debugs = true;
+	params.rssi_reporting_enabled = false;
+	params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
+	params.pwr_ctrl_automatic = false;
+	params.use_harq = false;
+
+	while ((opt = getopt_long(argc, argv, "i:e:t:l:csdmah", long_options_ping, &long_index)) !=
+	       -1) {
+		switch (opt) {
+	
+		
+		case '?':
+		default:
+			desh_error("Unknown option (%s). See usage:", argv[optind - 1]);
+			goto show_usage;
+		}
+	}
+	if (optind < argc) {
+		desh_error("Arguments without '-' not supported: %s", argv[argc - 1]);
+		goto show_usage;
+	}
+
+	if (params.role == DECT_PHY_COMMON_ROLE_NONE) {
+		desh_error("At least role need to be given. See usage:");
+		goto show_usage;
+	}
+
+	if (params.timeout_msecs >= (params.interval_secs * 1000)) {
+		desh_error("Timeout needs to be less than interval.");
+		goto show_usage;
+	}
+
+	ret = dect_phy_ctrl_ping_cmd(&params);
+	if (ret) {
+		desh_error("Cannot start ping command, ret: %d", ret);
+	} else {
+		desh_print("ping command started.");
+	}
+	return 0;
+
+show_usage:
+	desh_print_no_format(dect_phy_ping_cmd_usage_str);
+	return 0;
 }
 
-
-
-
-static int dect_phy_ping_cmd(const struct shell *shell, size_t argc, char **argv)
+static int dect_phy_ping_client_cmd(const struct shell *shell, size_t argc, char **argv)
 {
-    struct dect_phy_ping_params params;
-    int ret;
-    int long_index = 0;
-    int opt;
-    int tmp_value;
-    /* By default parse the original argv/argc, but allow 'dect ping client ...' */
-    char **parse_argv = (char **)argv;
-    int parse_argc = (int)argc;
+	struct dect_phy_ping_params params;
+	int ret;
+	int long_index = 0;
+	int opt;
+	
 
-    /* If no arguments provided, show concise interactive menu */
-    if (argc < 2) {
-        dect_phy_ping_menu_print(shell);
-        return 0;
-    }
+	if (argc < 2) {
+		goto show_usage;
+	}
+	optreset = 1;
+	optind = 1;
 
-    /* Stop/menu handling */
-    if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
-        desh_print("ping command stopping.");
-        dect_phy_ctrl_ping_cmd_stop();
-        return 0;
-    }
-   
+	if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
+		desh_print("ping command stopping.");
+		dect_phy_ctrl_ping_cmd_stop();
+		return 0;
+	}
+	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 
-    /* If role already set by key=value branch, ensure defaults for other fields are applied */
-    if (params.role == DECT_PHY_COMMON_ROLE_CLIENT || params.role == DECT_PHY_COMMON_ROLE_SERVER) {
-        struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+	/* Set defaults */
+	params.channel = 1677;
+	params.timeout_msecs = 1500;
+	params.interval_secs = 2;
+	params.ping_count = 4096;
+	params.role = DECT_PHY_COMMON_ROLE_CLIENT;
+	params.slot_count = 3;
+	params.destination_transmitter_id = 39;
+	params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
+	params.tx_power_dbm = current_settings->tx.power_dbm;
+	params.tx_mcs = current_settings->tx.mcs;
+	params.tx_lbt_period_symbols = 0;
+	params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
+	params.debugs = true;
+	params.rssi_reporting_enabled = false;
+	params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
+	params.pwr_ctrl_automatic = false;
+	params.use_harq = false;
+	
 
-        /* set defaults first (these may be overridden by parsed kv args) */
-        params.channel = params.channel ? params.channel : 1665;
-        params.timeout_msecs = params.timeout_msecs ? params.timeout_msecs : 1500;
-        params.interval_secs = params.interval_secs ? params.interval_secs : 2;
-        params.ping_count = params.ping_count ? params.ping_count : 5;
-        params.slot_count = params.slot_count ? params.slot_count : 1;
-        params.destination_transmitter_id = params.destination_transmitter_id ?
-                            params.destination_transmitter_id :
-                            DECT_PHY_DEFAULT_TRANSMITTER_LONG_RD_ID;
-        params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
-        params.tx_power_dbm = params.tx_power_dbm ? params.tx_power_dbm : current_settings->tx.power_dbm;
-        params.tx_mcs = params.tx_mcs ? params.tx_mcs : current_settings->tx.mcs;
-        params.tx_lbt_period_symbols = 0;
-        params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
-        params.debugs = true;
-        params.rssi_reporting_enabled = false;
-        params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
-        params.pwr_ctrl_automatic = false;
-        params.use_harq = false;
-
-        /* For server, if user did not specify count, run indefinitely approximation */
-        if (params.role == DECT_PHY_COMMON_ROLE_SERVER && params.ping_count == 5) {
-            params.ping_count = INT_MAX;
-        }
-
-        ret = dect_phy_ctrl_ping_cmd(&params);
-        if (ret) {
-            desh_error("Cannot start ping command, ret: %d", ret);
-            return 0;
-        }
-        desh_print("ping command started.");
-        return 0;
-    }
-
-    /* --- original getopt_long parsing path for full option support --- */
-    /* Set defaults */
-    {
-        struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-
-        params.channel = 1665;
-        params.timeout_msecs = 1500;
-        params.interval_secs = 2;
-        params.ping_count = 5;
-        params.role = DECT_PHY_COMMON_ROLE_NONE;
-        params.slot_count = 1;
-        params.destination_transmitter_id = DECT_PHY_DEFAULT_TRANSMITTER_LONG_RD_ID;
-        params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
-        params.tx_power_dbm = current_settings->tx.power_dbm;
-        params.tx_mcs = current_settings->tx.mcs;
-        params.tx_lbt_period_symbols = 0;
-        params.tx_lbt_rssi_busy_threshold_dbm = current_settings->rssi_scan.busy_threshold;
-        params.debugs = true;
-        params.rssi_reporting_enabled = false;
-        params.pwr_ctrl_pdu_expected_rx_rssi_level = -60;
-        params.pwr_ctrl_automatic = false;
-        params.use_harq = false;
-    }
-
-    while ((opt = getopt_long(parse_argc, parse_argv, "i:e:t:l:csdmah", long_options_ping,
-							  &long_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "i:e:t:l:csdmah", long_options_ping, &long_index)) !=
+	       -1) {
 		switch (opt) {
-		case 'd': {
-			params.debugs = true;
-			break;
-		}
-		case 'c': {
-			params.role = DECT_PHY_COMMON_ROLE_CLIENT;
-			break;
-		}
-		case 'm': {
-			params.rssi_reporting_enabled = true;
-			break;
-		}
-		case 's': {
-			params.role = DECT_PHY_COMMON_ROLE_SERVER;
-			break;
-		}
-		case 't': {
-			params.timeout_msecs = atoi(optarg);
-			break;
-		}
-		case 'i': {
-			params.interval_secs = atoi(optarg);
-			break;
-		}
-		case 'e': {
-			params.expected_rx_rssi_level = atoi(optarg);
-			break;
-		}
-		case 'l': {
-			ret = atoi(optarg);
-			if (ret <= 0) {
-				desh_error("Give decent value for the slot count (> 0)");
-				goto show_usage;
+		
+		case DECT_SHELL_PING_TX_PWR: {
+			params.tx_power_dbm = atoi(optarg);
+			if(params.tx_power_dbm < -40 || params.tx_power_dbm > 23){
+				desh_error("Power must be between -40 and 23");
+				return -EINVAL;
 			}
-			params.slot_count = ret;
+			break;
+		}
+		case DECT_SHELL_PING_TX_MCS: {
+			params.tx_mcs = atoi(optarg);
+			if(params.tx_mcs < 1 || params.tx_mcs > 4){
+				desh_error("MCS must be between 1 and 4");
+				return -EINVAL;
+			}
 			break;
 		}
 		case 'a': {
 			params.use_harq = true;
 			break;
 		}
-		case DECT_SHELL_PING_DEST_SERVER_TX_ID: {
-			params.destination_transmitter_id = atoi(optarg);
-			break;
-		}
-		case DECT_SHELL_PING_TX_PWR: {
-			params.tx_power_dbm = atoi(optarg);
-			break;
-		}
-		case DECT_SHELL_PING_TX_MCS: {
-			params.tx_mcs = atoi(optarg);
-			break;
-		}
-		case DECT_SHELL_PING_TX_LBT_PERIOD: {
-			tmp_value = atoi(optarg);
-			if (tmp_value < DECT_PHY_LBT_PERIOD_MIN_SYM ||
-				tmp_value > DECT_PHY_LBT_PERIOD_MAX_SYM) {
-				desh_error("Invalid LBT period %d (range: [%d,%d])",
-					   tmp_value,
-					   DECT_PHY_LBT_PERIOD_MIN_SYM,
-					   DECT_PHY_LBT_PERIOD_MAX_SYM);
-				goto show_usage;
-			}
-			params.tx_lbt_period_symbols = tmp_value;
-			break;
-		}
-		case DECT_SHELL_PING_TX_LBT_RSSI_BUSY_THRESHOLD: {
-			tmp_value = atoi(optarg);
-			if (tmp_value >= 0 ||
-			    tmp_value < INT8_MIN) {
-				desh_error("Invalid LBT RSSI busy threshold %d (range: [%d,-1])",
-					   tmp_value,
-					   INT8_MIN);
-				goto show_usage;
-			}
-			params.tx_lbt_rssi_busy_threshold_dbm = tmp_value;
-			break;
-		}
-		case DECT_SHELL_PING_CHANNEL: {
-			params.channel = atoi(optarg);
-			break;
-		}
-		case DECT_SHELL_PING_COUNT: {
-			ret = atoi(optarg);
-			if (ret <= 0) {
-				desh_error("Give decent value for the ping count (> 0)");
-				goto show_usage;
-			}
-			params.ping_count = ret;
-			break;
-		}
-		case DECT_SHELL_PING_TX_PWR_CTRL_PDU_RX_EXPECTED_RSSI_LEVEL: {
-			params.pwr_ctrl_pdu_expected_rx_rssi_level = atoi(optarg);
-			break;
-		}
-		case DECT_SHELL_PING_TX_PWR_CTRL_AUTO: {
-			params.pwr_ctrl_automatic = true;
-			break;
-		}
+		
 		case 'h':
 			goto show_usage;
 		case '?':
@@ -1038,8 +938,8 @@ static int dect_phy_ping_cmd(const struct shell *shell, size_t argc, char **argv
 			goto show_usage;
 		}
 	}
-	if (optind < parse_argc) {
-		desh_error("Arguments without '-' not supported: %s", parse_argv[parse_argc - 1]);
+	if (optind < argc) {
+		desh_error("Arguments without '-' not supported: %s", argv[argc - 1]);
 		goto show_usage;
 	}
 
@@ -1938,76 +1838,32 @@ show_usage:
 /* Periodic ping server function */
 static void dect_ping_server(const struct shell *shell, size_t argc, char **argv)
 {
-    struct dect_phy_ping_params params;
-    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-	
-
-
-    /* Set defaults */
-	params.destination_transmitter_id = 39;
-	params.channel = 1677;
-
-	
-
-
-
-    /* Start one ping operation */
-    int ret = dect_phy_ctrl_ping_cmd(&params);
+    int ret = dect_phy_ping_server_cmd(shell, argc, argv);
     if (ret) {
         desh_error("Cannot start ping server, ret: %d", ret);
         return;
     }
     
- 
-    
-    /* Stop the ping operation */
-    dect_phy_ctrl_ping_cmd_stop();
+
 }
 
 /* Periodic ping client function with MCS */
 static void dect_ping_client(const struct shell *shell, size_t argc, char **argv)
 {
-    struct dect_phy_ping_params params;
+   
+   
    
 	
-	int mcs = atoi(argv[1]);
-	printk("Selected MCS: %d\n", mcs);
-    if (mcs < 1 || mcs > 4) {
-        desh_error("MCS must be between 1 and 4");
-        return;
-    }
-	int power = atoi(argv[2]);
-	if (power < -40 || power > 23) {
-		desh_error("Power must be between -40 and 23");
-		return;
-	}
-	printk("Selected power: %d\n", power);
-
-
-
-    /* Set defaults */
-	params.channel = 1677;
-	params.tx_mcs = mcs;
-	
-
-   
-	while(1){
-		/* Start one ping operation */
-    int ret = dect_phy_ctrl_ping_cmd(&params);
+    int ret = dect_phy_ping_client_cmd(shell, argc, argv);
     if (ret) {
         desh_error("Cannot start ping client, ret: %d", ret);
         return;
     }
 
-    /* Sleep for 5 seconds */
-    k_sleep(K_MSEC(5000));
-	}
-    
+return;
+
 
 }
-
-
-
 /**************************************************************************************************/
 
 /* A placeholder for all dect commands that are configured in the dect_*_shell.c files */
@@ -2067,10 +1923,6 @@ SHELL_SUBCMD_ADD((dect), rf_tool, NULL,
 		 dect_phy_rf_tool_cmd, 1, 35);
 
 
-SHELL_SUBCMD_ADD((dect), ping, NULL,
-		 "dect ping command.\n"
-		 " Usage: dect ping [options: see: dect ping -h]",
-		 dect_phy_ping_cmd, 1, 35);
 SHELL_SUBCMD_ADD((dect), ping_client, NULL,
 		 "dect ping client command.\n"
 		 " Usage: dect ping_client [options: see: dect ping_client -h]",
