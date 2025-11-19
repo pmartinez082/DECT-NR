@@ -14,7 +14,7 @@ The program is already flashed on both kits.
 ### Command
 
 ```bash
-dect ping -s --channel 1677 -t -1
+dect ping_server
 ```
 
 ---
