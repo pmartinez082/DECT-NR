@@ -840,49 +840,7 @@ static void dect_phy_ping_menu_print(const struct shell *shell)
 
 
 
-static bool dect_phy_parse_kv_args(const struct shell *shell, int argc, char **argv,
-                   struct dect_phy_ping_params *params)
-{
-    for (int i = 1; i < argc; i++) {
-        char *arg = argv[i];
-        char *eq = strchr(arg, '=');
-        if (!eq) {
-            shell_print(shell, "Invalid argument '%s' (expected key=value)\n", arg);
-            return false;
-        }
-        *eq = '\0';
-        const char *key = arg;
-        const char *val = eq + 1;
-        int v = atoi(val);
 
-        if (strcmp(key, "channel") == 0) {
-            params->channel = v;
-        } else if (strcmp(key, "tx_mcs") == 0 || strcmp(key, "mcs") == 0) {
-            params->tx_mcs = v;
-        } else if (strcmp(key, "tx_pwr") == 0 || strcmp(key, "tx_power") == 0 || strcmp(key, "txpwr") == 0) {
-            params->tx_power_dbm = v;
-        } else if (strcmp(key, "count") == 0) {
-            params->ping_count = v;
-        } else if (strcmp(key, "timeout") == 0) {
-            params->timeout_msecs = v;
-        } else if (strcmp(key, "interval") == 0) {
-            params->interval_secs = v;
-        } else if (strcmp(key, "slots") == 0 || strcmp(key, "l") == 0) {
-            params->slot_count = v;
-        } else if (strcmp(key, "s_tx_id") == 0 || strcmp(key, "s_tx") == 0) {
-            params->destination_transmitter_id = v;
-        } else {
-            shell_print(shell, "Unknown key '%s'\n", key);
-            return false;
-        }
-    }
-    return true;
-}
-
-/* Replace use of interactive prompts:
- * If user typed: "dect ping client channel=1665 tx_mcs=2 tx_pwr=0" they will get parsed.
- * If user typed just "dect ping client" we show the menu + example.
- */
 static int dect_phy_ping_cmd(const struct shell *shell, size_t argc, char **argv)
 {
     struct dect_phy_ping_params params;
@@ -907,28 +865,6 @@ static int dect_phy_ping_cmd(const struct shell *shell, size_t argc, char **argv
         return 0;
     }
    
-
-    /* Role detection when first token is client/server */
-    if (argv[1] != NULL && !strcmp(argv[1], "client")) {
-        params.role = DECT_PHY_COMMON_ROLE_CLIENT;
-        /* If only role, print menu and example for non-blocking flow */
-       
-        /* else parse key=value args starting from argv[1] */
-        if (!dect_phy_parse_kv_args(shell, argc - 1, &argv[1], &params)) {
-            return 0;
-        }
-    } else if (argv[1] != NULL && !strcmp(argv[1], "server")) {
-        params.role = DECT_PHY_COMMON_ROLE_SERVER;
-        
-        if (!dect_phy_parse_kv_args(shell, argc - 1, &argv[1], &params)) {
-            return 0;
-        }
-    } else {
-        /* fallback: use getopt-like parsing of long options as before */
-        parse_argv = (char **)argv;
-        parse_argc = (int)argc;
-        /* Initialize defaults below and continue to getopt_long parsing path */
-    }
 
     /* If role already set by key=value branch, ensure defaults for other fields are applied */
     if (params.role == DECT_PHY_COMMON_ROLE_CLIENT || params.role == DECT_PHY_COMMON_ROLE_SERVER) {
