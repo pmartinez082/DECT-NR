@@ -5,7 +5,7 @@
 
 ## Overview
 This guide explains how to run the **DECT Ping** test using two kits — one configured as the RX server and the other as the TX client.  
-The program is already flashed on both kits (with `MCS` hardcoded to **4**).
+The program is already flashed on both kits. 
 
 ---
 
@@ -23,7 +23,7 @@ dect ping -s --channel 1677 -t -1
 
 ### Command
 ```bash
-dect ping -c --s_tx_id 39 --c_tx_pwr -40 -i 3 -t 2000 -l 4 --c_tx_mcs 4 --c_count 4096 --channel 1677 --c_slots 3
+dect ping_client --tx_mcs <int> --tx_pwr <int>
 ```
 
 ---
@@ -41,7 +41,6 @@ CSV header format: [channel, mcs, snr]
 [PCC, PDC, PCC_err, PDC_err]
 ```
 
-> **Note:** PCC’s MCS is hardcoded to **1**.  
 > **Important:** SNR results are **linear**, not logarithmic.
 
 ---
