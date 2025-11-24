@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 # === Load CSV ===
-df = pd.read_csv('csv_files/20251028_ping.csv')
+df = pd.read_csv('csv_files/anite_gauss.csv')
 
 # === Clean data ===
 df.columns = df.columns.str.lower()
@@ -15,7 +15,7 @@ df = df[df['snr'] > 0]
 # PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
 df['packet_error'] = df['channel'].apply(
     lambda x: 0 if x.upper() == 'PDC' or x.upper() == 'PCC'
-    else 1 if x.upper() in ['PDC_ERR', 'PCC_ERR']
+    else 1 if x.upper() in ['PDC_ERR']
     else np.nan
 )
 

@@ -1580,6 +1580,7 @@ int dect_phy_ctrl_ping_cmd(struct dect_phy_ping_params *params)
 
 	dect_phy_ctrl_mdm_op_cancel_all();
 	dect_phy_ctrl_msgq_non_data_op_add(DECT_PHY_CTRL_OP_DEBUG_OFF);
+	
 	ctrl_data.ping_ongoing = true;
 	ret = dect_phy_ping_cmd_handle(params);
 	if (ret) {

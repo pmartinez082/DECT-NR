@@ -204,11 +204,11 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	}
 
 	/* Set defaults */
-	params.duration_secs = 5;
+	params.duration_secs = 65535;
 	params.tx_power_dbm = current_settings->tx.power_dbm;
 	params.tx_mcs = current_settings->tx.mcs;
 	params.role = DECT_PHY_COMMON_ROLE_NONE;
-	params.channel = 1665;
+	params.channel = 1677;
 	params.slot_count = 2;
 	params.slot_gap_count = 2;
 	params.subslot_gap_count = 0; /* As a default, in slots. */
@@ -809,7 +809,7 @@ static int dect_phy_ping_server_cmd(const struct shell *shell, size_t argc, char
 	/* Set defaults */
 	params.channel = 1677;
 	params.timeout_msecs = 65535;
-	params.interval_secs = 2;
+	params.interval_secs = 1;
 	params.ping_count = 5;
 	params.role = DECT_PHY_COMMON_ROLE_SERVER;
 	params.slot_count = 3;
@@ -828,8 +828,10 @@ static int dect_phy_ping_server_cmd(const struct shell *shell, size_t argc, char
 	while ((opt = getopt_long(argc, argv, "i:e:t:l:csdmah", long_options_ping, &long_index)) !=
 	       -1) {
 		switch (opt) {
-	
-		
+		case 'i': {
+			params.interval_secs = atoi(optarg);
+			break;
+		}
 		case '?':
 		default:
 			desh_error("Unknown option (%s). See usage:", argv[optind - 1]);
@@ -846,7 +848,8 @@ static int dect_phy_ping_server_cmd(const struct shell *shell, size_t argc, char
 		goto show_usage;
 	}
 
-	if (params.timeout_msecs >= (params.interval_secs * 1000)) {
+	/* Skip timeout validation in fast mode (interval_secs <= 0) */
+	if (params.interval_secs > 0 && params.timeout_msecs >= (params.interval_secs * 1000)) {
 		desh_error("Timeout needs to be less than interval.");
 		goto show_usage;
 	}
@@ -887,8 +890,8 @@ static int dect_phy_ping_client_cmd(const struct shell *shell, size_t argc, char
 
 	/* Set defaults */
 	params.channel = 1677;
-	params.timeout_msecs = 1500;
-	params.interval_secs = 2;
+	params.timeout_msecs = 500;
+	params.interval_secs = 1;
 	params.ping_count = 4096;
 	params.role = DECT_PHY_COMMON_ROLE_CLIENT;
 	params.slot_count = 3;
@@ -908,7 +911,10 @@ static int dect_phy_ping_client_cmd(const struct shell *shell, size_t argc, char
 	while ((opt = getopt_long(argc, argv, "i:e:t:l:csdmah", long_options_ping, &long_index)) !=
 	       -1) {
 		switch (opt) {
-		
+		case 'i': {
+			params.interval_secs = atoi(optarg);
+			break;
+		}
 		case DECT_SHELL_PING_TX_PWR: {
 			params.tx_power_dbm = atoi(optarg);
 			if(params.tx_power_dbm < -40 || params.tx_power_dbm > 23){
@@ -948,7 +954,8 @@ static int dect_phy_ping_client_cmd(const struct shell *shell, size_t argc, char
 		goto show_usage;
 	}
 
-	if (params.timeout_msecs >= (params.interval_secs * 1000)) {
+	/* Skip timeout validation in fast mode (interval_secs <= 0) */
+	if (params.interval_secs > 0 && params.timeout_msecs >= (params.interval_secs * 1000)) {
 		desh_error("Timeout needs to be less than interval.");
 		goto show_usage;
 	}

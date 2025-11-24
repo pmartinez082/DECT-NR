@@ -810,11 +810,22 @@ static void dect_phy_ping_client_tx_schedule(uint64_t first_possible_tx)
 
 	sched_list_item_conf->cb_op_completed = dect_phy_ping_client_tx_complete_cb;
 
-	sched_list_item_conf->interval_mdm_ticks =
-		SECONDS_TO_MODEM_TICKS(cmd_params->interval_secs);
-	sched_list_item_conf->interval_count_left = cmd_params->ping_count;
-	sched_list_item_conf->cb_op_to_mdm_with_interval_count_completed =
-		dect_phy_ping_client_tx_all_intervals_done;
+	/* For fast back-to-back transmission (like perf):
+	 * If interval is 0, use minimal spacing; otherwise use the configured interval. */
+	uint64_t interval_mdm_ticks;
+	if (cmd_params->interval_secs > 0) {
+		interval_mdm_ticks = SECONDS_TO_MODEM_TICKS(cmd_params->interval_secs);
+	} else if (cmd_params->interval_secs == 0) {
+		/* Fast mode: minimal gap between packets (one slot duration only) */
+		interval_mdm_ticks = cmd_params->slot_count * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
+	} else {
+		/* Default fallback: 1 second */
+		interval_mdm_ticks = SECONDS_TO_MODEM_TICKS(1);
+	}
+	sched_list_item_conf->interval_mdm_ticks = interval_mdm_ticks;
+    sched_list_item_conf->interval_count_left = cmd_params->ping_count;
+    sched_list_item_conf->cb_op_to_mdm_with_interval_count_completed =
+         dect_phy_ping_client_tx_all_intervals_done;
 
 	sched_list_item_conf->length_slots = cmd_params->slot_count;
 	sched_list_item_conf->length_subslots = 0;
@@ -1450,7 +1461,6 @@ static void dect_phy_ping_server_report_local_and_tx_results(void)
 			ping_data.rx_metrics.rx_phy_transmit_pwr_high));
 	sprintf(results_str + strlen(results_str), "  rx: min SNR %d, max SNR %d\n",
 		ping_data.rx_metrics.rx_snr_low, ping_data.rx_metrics.rx_snr_high);
-	sprintf(results_str + strlen(results_str), "  rx: PER                      %d\n", ping_data.rx_metrics.per);
 	
 
 	desh_print("%s", results_str);
@@ -1926,7 +1936,7 @@ static void dect_phy_ping_thread_fn(void)
 					char snum[64] = {0};
 
 					for (i = 0; i < 64 && i < params->data_length; i++) {
-						sprintf(&hex_data[i], "%02x ", params->data[i]);
+						sprintf(&hex_data[i], "%02x", params->data[i]);
 					}
 					hex_data[i + 1] = '\0';
 					desh_warn("ping: received unknown data (type: %s), len %d, "
