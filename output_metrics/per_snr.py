@@ -39,9 +39,9 @@ for mcs in sorted(per_data['mcs'].unique()):
     mcs_data = per_data[per_data['mcs'] == mcs].sort_values('snr_db')
     plt.scatter(mcs_data['snr_db'], mcs_data['per'], marker='o', label=f'MCS {mcs}')
 
-plt.xlabel('SNR [dB]')
-plt.ylabel('Packet Error Rate (PER)')
-plt.title('PER vs SNR per MCS')
+plt.xlabel('Signal-to-Noise Ratio (dB)')
+plt.ylabel('Packet Error Rate')
+plt.title('AWGN channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')  # <<< Make y-axis logarithmic
 
@@ -49,5 +49,5 @@ plt.legend(title='MCS')
 plt.tight_layout()
 
 # Save and show
-plt.savefig('output/per_vs_snr.pdf', format='pdf')
+plt.savefig('output/AWGN.pdf', format='pdf')
 plt.show()
