@@ -60,17 +60,15 @@ plt.tight_layout()
 
 # Print snr values that need more data (1M samples needed per SNR value per MCS) and save to CSV file
 
-csv_data = [ ['SNR (dB)', 'MCS', 'Current Samples', 'Additional Samples Needed'] ]
-required_samples = 1_000_000
+csv_data = [['snr','SNR(dB)', 'MCS', 'Current Samples' ]]
 for _, row in per_data.iterrows():
-    if int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0]) < required_samples:
-        csv_data.append([row['snr'], int(row['mcs']), int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0]), required_samples - int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0])])
+        csv_data.append([row['snr'],10 * np.log10(row['snr']), int(row['mcs']), int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0])])
 
 # sort csv_data by MCS and SNR
 # Separate header and data, then sort data only
 csv_header = csv_data[0]
 csv_data_rows = csv_data[1:]
-csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[1]), float(x[0])))
+csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))
 csv_data = [csv_header] + csv_data_rows
 
 # Save and show
