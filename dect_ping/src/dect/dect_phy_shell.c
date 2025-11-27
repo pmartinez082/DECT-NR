@@ -179,6 +179,7 @@ static struct option long_options_perf[] = {
 	 DECT_SHELL_PERF_HARQ_MDM_EXPIRY_TIME},
 	{"c_tx_pwr", required_argument, 0, DECT_SHELL_PERF_TX_PWR},
 	{"c_tx_mcs", required_argument, 0, DECT_SHELL_PERF_TX_MCS},
+	{"pdc_number", required_argument, 0, 'p'},
 	{0, 0, 0, 0}};
 
 static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv)
@@ -227,7 +228,7 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 		current_settings->harq.harq_feedback_tx_delay_subslot_count;
 	params.server_harq_feedback_tx_rx_delay_subslot_count = 4;
 
-	while ((opt = getopt_long(argc, argv, "e:t:csadh", long_options_perf, &long_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "e:t:csadh p:", long_options_perf, &long_index)) != -1) {
 		switch (opt) {
 		case 'd': {
 			params.debugs = true;
@@ -251,6 +252,10 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 		}
 		case 'e': {
 			params.expected_rx_rssi_level = atoi(optarg);
+			break;
+		}
+		case 'p': {
+			params.pdc_number = atoi(optarg);
 			break;
 		}
 		case DECT_SHELL_PERF_DEST_SERVER_TX_ID: {

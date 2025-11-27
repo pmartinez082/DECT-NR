@@ -39,13 +39,13 @@ per_data = (
 )
 
 # === Convert SNR to dB ===
-per_data['snr_db'] = 10 * np.log10(per_data['snr'])
+
 
 # === Plot ===
 plt.figure(figsize=(8,6))
 for mcs in sorted(per_data['mcs'].unique()):
-    mcs_data = per_data[per_data['mcs'] == mcs].sort_values('snr_db')
-    plt.scatter(mcs_data['snr_db'], mcs_data['per'], marker='o', label=f'MCS {mcs}')
+    mcs_data = per_data[per_data['mcs'] == mcs].sort_values('snr')
+    plt.scatter(mcs_data['snr'], mcs_data['per'], marker='o', label=f'MCS {mcs}')
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
@@ -58,14 +58,12 @@ plt.tight_layout()
 
 
 
-# Print snr values that need more data (1M samples needed per SNR value per MCS) and save to CSV file
 
-csv_data = [['snr','SNR(dB)', 'MCS', 'Current Samples' ]]
+csv_data = [['SNR(dB)', 'MCS', 'Current Samples' ]]
 for _, row in per_data.iterrows():
-        csv_data.append([row['snr'],10 * np.log10(row['snr']), int(row['mcs']), int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0])])
+        csv_data.append([row['snr'], int(row['mcs']), int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0])])
 
 # sort csv_data by MCS and SNR
-# Separate header and data, then sort data only
 csv_header = csv_data[0]
 csv_data_rows = csv_data[1:]
 csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))

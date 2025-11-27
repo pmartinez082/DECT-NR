@@ -1519,7 +1519,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PCC_ERR,%d,%d", params->crc_failure.snr, perf_data.rx_metrics.rx_latest_mcs);
+			desh_print("PCC_ERR,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PDC_CRC_ERROR: {
@@ -1537,7 +1537,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PDC_ERR,%d,%d",params->crc_failure.snr, perf_data.rx_metrics.rx_latest_mcs);
+			desh_print("PDC_ERR,100,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.rssi_2);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PCC: {
@@ -1666,17 +1666,16 @@ rx_pcc_debug:
 					}
 				} else if (pdu_type == DECT_MAC_MESSAGE_TYPE_PERF_HARQ_FEEDBACK) {
 					/* desh_print("Perf: HARQ feedback response received."); */
-				} else {
-					char snum[64] = {0};
-					unsigned char hex_data[128];
-					int i;
-					struct nrf_modem_dect_phy_pdc_event *p_rx_status =
-						&(params->rx_status);
-					int16_t rssi_level = p_rx_status->rssi_2 / 2;
+			} else {
+				char snum[64] = {0};
+				unsigned char hex_data[128];
+				int i;
+				struct nrf_modem_dect_phy_pdc_event *p_rx_status =
+					&(params->rx_status);
+				int16_t rssi_level = p_rx_status->rssi_2 / 2;
 
-					desh_print("PDC,%d,%d", p_rx_status->snr, perf_data.rx_metrics.rx_latest_mcs);
-
-					for (i = 0; i < 64 && i < params->data_length; i++) {
+				desh_print("PDC,%d,%d", perf_data.cmd_params.pdc_number, perf_data.rx_metrics.rx_latest_mcs);					
+				for (i = 0; i < 64 && i < params->data_length; i++) {
 						sprintf(&hex_data[i], "%02x ", params->data[i]);
 					}
 					hex_data[i + 1] = '\0';
@@ -1801,6 +1800,12 @@ int dect_phy_perf_cmd_handle(struct dect_phy_perf_params *params)
 		desh_error("perf command already running");
 		return -1;
 	}
+
+	/* Set default PDC number if not set (0 means use default) */
+	if (params->pdc_number == 0) {
+		params->pdc_number = 100;
+	}
+
 	dect_phy_perf_phy_init();
 
 	ret = dect_phy_perf_start(params, START);
@@ -1896,7 +1901,7 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
 		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
-		desh_print("pdc,%d,%d", params->snr, perf_data.rx_metrics.rx_latest_mcs);
+		desh_print("pdc,%d,%d",perf_data.cmd_params.pdc_number,perf_data.rx_metrics.rx_latest_mcs);
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
 		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
 			//desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);

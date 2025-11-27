@@ -53,6 +53,9 @@ struct dect_phy_perf_params {
 
 	/* Gap between HARQ feedback TX end and re-starting a server RX. */
 	uint8_t server_harq_feedback_tx_rx_delay_subslot_count;
+
+	/* PDC number for output reporting (e.g., pdc,100) */
+	uint16_t pdc_number;
 };
 
 enum dect_phy_rf_tool_mode {
