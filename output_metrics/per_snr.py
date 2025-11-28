@@ -8,16 +8,18 @@ df = pd.read_csv('csv_files/anite_gauss.csv')
 
 # === Clean data ===
 df.columns = df.columns.str.lower()
-
+shape = df.shape[0]
 
 # Drop rows where snr is <= 0
-df = df[df['snr'] > 0]
+df = df[df['snr'] >= 0]
+
+
 
 # Assign packet error based on channel
 # PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
 df['packet_error'] = df['channel'].apply(
     lambda x: 0 if x.upper() == 'PDC' or x.upper() == 'PCC'
-    else 1 if x.upper() in ['PDC_ERR' ]
+    else 1 if x.upper() in ['PDC_ERR' ] or x.upper() == 'PCC_ERR'
     else np.nan
 )
 
@@ -28,7 +30,10 @@ df = df.dropna(subset=['packet_error'])
 df = df[df['mcs'] > 0]
 df = df[df['mcs'] < 5]
 
+# temporal: only get mcs 1 & 2 values
+df = df[df['mcs'] < 3]
 
+print("Dropped rows:", shape - df.shape[0])
 
 # === Compute PER per SNR per MCS ===
 per_data = (
@@ -45,7 +50,8 @@ per_data = (
 plt.figure(figsize=(8,6))
 for mcs in sorted(per_data['mcs'].unique()):
     mcs_data = per_data[per_data['mcs'] == mcs].sort_values('snr')
-    plt.scatter(mcs_data['snr'], mcs_data['per'], marker='o', label=f'MCS {mcs}')
+    if not mcs_data.empty:
+        plt.scatter(mcs_data['snr'], mcs_data['per'], marker='o', label=f'MCS {mcs}')
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
@@ -53,7 +59,10 @@ plt.title('AWGN channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')  # <<< Make y-axis logarithmic
 
-plt.legend(title='MCS')
+# Only create legend if there are artists with labels
+handles, labels = plt.gca().get_legend_handles_labels()
+if handles:
+    plt.legend(title='MCS')
 plt.tight_layout()
 
 

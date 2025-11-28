@@ -1519,7 +1519,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PCC_ERR,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs);
+			desh_print("PCC_ERR,%d,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PDC_CRC_ERROR: {
@@ -1537,7 +1537,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PDC_ERR,100,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.rssi_2);
+			desh_print("PDC_ERR,%d,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PCC: {
@@ -1674,7 +1674,6 @@ rx_pcc_debug:
 					&(params->rx_status);
 				int16_t rssi_level = p_rx_status->rssi_2 / 2;
 
-				desh_print("PDC,%d,%d", perf_data.cmd_params.pdc_number, perf_data.rx_metrics.rx_latest_mcs);					
 				for (i = 0; i < 64 && i < params->data_length; i++) {
 						sprintf(&hex_data[i], "%02x ", params->data[i]);
 					}
@@ -1901,7 +1900,7 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
 		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
-		desh_print("pdc,%d,%d",perf_data.cmd_params.pdc_number,perf_data.rx_metrics.rx_latest_mcs);
+		desh_print("pdc,%d,%d,%d",perf_data.cmd_params.pdc_number,perf_data.rx_metrics.rx_latest_mcs, params->snr);
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
 		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
 			//desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);
