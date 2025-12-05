@@ -6,34 +6,47 @@ import csv
 # === Load CSV ===
 df = pd.read_csv('csv_files/anite_gauss.csv')
 
+'''
+Current measurement settings:
+- slot count: 2
+- slot gap count: 2
+- subslot gap count: 0
+- channel: 1677
+- power = -20'''
+
 # === Clean data ===
 df.columns = df.columns.str.lower()
+
 shape = df.shape[0]
 
-# Drop rows where snr is <= 0
+
 df = df[df['snr'] >= 0]
-
-
-
-# Assign packet error based on channel
-# PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
-df['packet_error'] = df['channel'].apply(
-    lambda x: 0 if x.upper() == 'PDC' or x.upper() == 'PCC'
-    else 1 if x.upper() in ['PDC_ERR' ] or x.upper() == 'PCC_ERR'
-    else np.nan
-)
-
-# Drop rows where packet_error is NaN (unexpected channel names)
-df = df.dropna(subset=['packet_error'])
-
 # Drop rows where mcs > 4 | mcs < 1
 df = df[df['mcs'] > 0]
 df = df[df['mcs'] < 5]
 
-# temporal: only get mcs 1 & 2 values
-df = df[df['mcs'] < 3]
+
+
+
+df.to_csv('csv_files/anite_gauss_cleaned.csv', index=False)
+# Assign packet error based on channel
+# PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
+df['packet_error'] = df['channel'].apply(
+    lambda x: 0 if x.upper() == 'PDC' 
+    else 1 if x.upper() in ['PDC_ERR' ] or x.upper() == 'PCC_ERR'
+    else np.nan
+)
+
+
+# Drop rows where packet_error is NaN (unexpected channel names)
+df = df.dropna(subset=['packet_error'])
+
+
+
 
 print("Dropped rows:", shape - df.shape[0])
+
+
 
 # === Compute PER per SNR per MCS ===
 per_data = (
@@ -42,8 +55,6 @@ per_data = (
     .reset_index()
     .rename(columns={'packet_error': 'per'})
 )
-
-# === Convert SNR to dB ===
 
 
 # === Plot ===
