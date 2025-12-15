@@ -33,7 +33,7 @@ df.to_csv('csv_files/anite_gauss_cleaned.csv', index=False)
 # PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
 df['packet_error'] = df['channel'].apply(
     lambda x: 0 if x.upper() == 'PDC' 
-    else 1 if x.upper() in ['PDC_ERR' ] or x.upper() == 'PCC_ERR'
+    else 1 if x.upper() in ['PDC_ERR' ] 
     else np.nan
 )
 
@@ -90,7 +90,7 @@ csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))
 csv_data = [csv_header] + csv_data_rows
 
 # Save and show
-plt.savefig('output/AWGN.pdf', format='pdf')
+plt.savefig('output/AWGN_txarto.pdf', format='pdf')
 
 
 # Save CSV data

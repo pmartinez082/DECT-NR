@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DECT Control Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>DECT Control Panel</h1>
+
+  <div class="container">
+
+    <!-- ================= SERVER ================= -->
+    <div class="panel left-div">
+      <h2>Server</h2>
+
+      <label for="server-serial">Server J-Link Serial</label>
+      <input
+        type="text"
+        id="server-serial"
+        placeholder="COM11"
+        value="COM11"
+      >
+
+      <label for="snr-input">SNR</label>
+      <input
+        type="number"
+        id="snr-input"
+        placeholder="Enter SNR"
+      >
+
+      <div class="button-row">
+        <button id="start-server">Start Server</button>
+        <button id="stop-server" class="danger">Stop Server</button>
+      </div>
+
+      <pre id="server-output" class="terminal"></pre>
+    </div>
+
+    <!-- ================= CLIENT ================= -->
+    <div class="panel right-div">
+      <h2>Client</h2>
+
+      <label for="client-serial">Client J-Link Serial</label>
+      <input
+        type="text"
+        id="client-serial"
+        placeholder="COM9"
+        value="COM9"
+      >
+
+      <label for="mcs-input">MCS</label>
+      <input
+        type="number"
+        id="mcs-input"
+        placeholder="Enter MCS"
+      >
+
+      <div class="button-row">
+        <button id="start-client">Start Client</button>
+        <button id="stop-client" class="danger">Stop Client</button>
+      </div>
+
+      <pre id="client-output" class="terminal"></pre>
+    </div>
+
+  </div>
+
+  <!-- ================= DEBUG ================= -->
+  <div class="debug-panel">
+    <h2>Debug Log</h2>
+    <textarea id="debugLog" readonly></textarea>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

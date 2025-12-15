@@ -1,0 +1,8 @@
+si SWD
+speed 4000
+device NRF9151_XXCA
+selectemubysn 1051216009
+connect
+rtt start
+rtt write 0 "dect perf -s -p 2\n"
+rtt read

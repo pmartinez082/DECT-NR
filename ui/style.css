@@ -1,0 +1,121 @@
+/* General resets */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Body */
+body {
+    background-color: #f5f7fa;
+    color: #333;
+    padding: 30px;
+}
+
+/* Headings */
+h1 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #1a1a1a;
+    text-align: center;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-top: 30px;
+    margin-bottom: 10px;
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 5px;
+}
+
+/* Labels and Inputs */
+label {
+    display: inline-block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+input[type="text"] {
+    width: calc(100% - 12px);
+    padding: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+/* Buttons */
+button {
+    padding: 10px 20px;
+    margin-right: 10px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+/* Output log */
+pre {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    padding: 10px;
+    border-radius: 5px;
+    height: 200px;
+    overflow-y: auto;
+    font-family: 'Courier New', Courier, monospace;
+    margin-top: 10px;
+}
+
+/* Form sections */
+div.section {
+    margin-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    input[type="text"] {
+        width: 100%;
+    }
+
+    button {
+        margin-top: 10px;
+        margin-right: 0;
+        width: 48%;
+    }
+}
+
+.left-div {
+    float: left;
+    /*extend to the center*/
+    width: 50%;
+    padding: 10px;
+}
+.right-div {
+    float: right;
+    width: 50%;
+    padding: 10px;
+}
