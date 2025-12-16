@@ -6,6 +6,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const clientOut = document.getElementById('client-output');
   const debugLog = document.getElementById('debugLog');
 
+
   document.getElementById('start-server').onclick = () => {
     ipcRenderer.send('start-server', {
       serial: document.getElementById('server-serial').value,
@@ -16,6 +17,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('stop-server').onclick = () => {
     ipcRenderer.send('stop-server');
   };
+
+  
 
   document.getElementById('start-client').onclick = () => {
     ipcRenderer.send('start-client', {

@@ -173,7 +173,8 @@ int main(void)
 	/* Reset reason can only be read once, because the register needs to be cleared after
 	 * reading.
 	 */
-	desh_print_reset_reason();
+	
+	//desh_print_reset_reason();
 
 #if defined(CONFIG_DESH_STARTUP_CMDS)
 	struct k_work_queue_config cfg = {

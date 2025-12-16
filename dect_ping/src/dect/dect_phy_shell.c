@@ -364,7 +364,7 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	if (ret) {
 		desh_error("Cannot start perf command, ret: %d", ret);
 	} else {
-		desh_print("perf command started.");
+		//desh_print("perf command started.");
 	}
 	return 0;
 

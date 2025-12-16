@@ -832,12 +832,12 @@ static int dect_phy_perf_client_start(void)
 		first_possible_tx += MS_TO_MODEM_TICKS(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS);
 	}
 
-	desh_print(
+	/*desh_print(
 		"Starting perf client on channel %d: byte count per TX: %d, slots %d, gap %lld mdm "
 		"ticks, mcs %d, duration %d secs, expected RSSI level on RX %d.",
 		params->channel, perf_pdu_byte_count, params->slot_count,
 		params->slot_gap_count_in_mdm_ticks, params->tx_mcs, params->duration_secs,
-		params->expected_rx_rssi_level);
+		params->expected_rx_rssi_level);*/
 
 	uint16_t perf_pdu_payload_byte_count =
 		perf_pdu_byte_count - DECT_PHY_PERF_TX_DATA_PDU_LEN_WITHOUT_PAYLOAD;
