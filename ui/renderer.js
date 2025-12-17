@@ -30,6 +30,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('stop-client').onclick = () => {
     ipcRenderer.send('stop-client');
   };
+  document.getElementById('create-graph').onclick = () => {
+    ipcRenderer.send('create-graph');
+    
+    
+  }
 
   ipcRenderer.on('server-output', (_, data) => {
     serverOut.textContent += data;
@@ -46,4 +51,14 @@ window.addEventListener('DOMContentLoaded', () => {
     debugLog.scrollTop = debugLog.scrollHeight;
   });
 
+});
+
+ipcRenderer.on('refresh-graph', () => {
+  const embed = document.getElementById('graph-embed');
+  // Force reload by changing the src (adding cache-busting query)
+  embed.src = `output/AWGN.pdf?cb=${new Date().getTime()}`;
+});
+
+document.getElementById('test-connection').addEventListener('click', () => {
+  ipcRenderer.send('test-connection');
 });
