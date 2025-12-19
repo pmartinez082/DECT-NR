@@ -4,7 +4,7 @@ import pandas as pd
 import csv
 
 # === Load CSV ===
-df = pd.read_csv('output/server_output.csv')
+df = pd.read_csv('output/anite_AWGN_corrected.csv')
 
 '''
 Current measurement settings:
@@ -12,7 +12,7 @@ Current measurement settings:
 - slot gap count: 2
 - subslot gap count: 0
 - channel: 1677
-- power = -20'''
+- power = -20 dBm'''
 
 # === Clean data ===
 df.columns = df.columns.str.lower()
@@ -28,7 +28,7 @@ df = df[df['mcs'] < 5]
 
 
 
-df.to_csv('output/server_output_clean.csv', index=False)
+df.to_csv('output/anite_AWGN_corrected_clean.csv', index=False)
 # Assign packet error based on channel
 # PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
 df['packet_error'] = df['channel'].apply(

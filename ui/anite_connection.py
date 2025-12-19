@@ -1,7 +1,13 @@
 import socket
 import sys
-import traceback
 from datetime import datetime
+
+SERVER_IP = "192.168.1.1"
+SERVER_PORT = 3334
+TIMEOUT = 10
+
+EMULATION_PATH = r'"D:\User Emulations\ChannelSounder\DECT-AWGN.smu"'
+
 
 
 def log(msg: str) -> None:
@@ -9,65 +15,58 @@ def log(msg: str) -> None:
     print(f"[ANITE][{ts}] {msg}", flush=True)
 
 
-def connect_socket(server: str, port: int) -> socket.socket:
-    for res in socket.getaddrinfo(server, port, socket.AF_UNSPEC, socket.SOCK_STREAM):
-        af, socktype, proto, canonname, sa = res
-        try:
-            s = socket.socket(af, socktype, proto)
-            s.settimeout(5)
-            s.connect(sa)
-            return s
-        except OSError:
-            try:
-                s.close()
-            except Exception:
-                pass
-            continue
-
-    raise ConnectionError(f"Unable to connect to {server}:{port}")
+def connect() -> socket.socket:
+    log(f"Connecting to {SERVER_IP}:{SERVER_PORT}")
+    s = socket.create_connection((SERVER_IP, SERVER_PORT), timeout=TIMEOUT)
+    log("Connection established")
+    return s
 
 
-def send_command(sock: socket.socket, cmd: str) -> None:
-    log(f"Sending command: {cmd}")
+def send(sock: socket.socket, cmd: str) -> None:
+    log(f">>> {cmd}")
     sock.sendall((cmd + "\n").encode("ascii"))
 
 
-def read_response(sock: socket.socket) -> str:
-    response = bytearray()
-
+def recv_line(sock: socket.socket) -> str:
+    buf = bytearray()
     while True:
-        chunk = sock.recv(1)
-        if not chunk:
+        b = sock.recv(1)
+        if not b:
             break
-        response.extend(chunk)
-        if chunk == b"\n":
+        buf.extend(b)
+        if b == b"\n":
             break
+    return buf.decode("ascii").strip()
 
-    return response.decode("ascii").strip()
+
+def check_error(sock: socket.socket) -> None:
+    send(sock, "SYST:ERR?")
+    err = recv_line(sock)
+    log(f"<<< SYST:ERR? → {err}")
+    if not err.startswith("0"):
+        raise RuntimeError(err)
 
 
 def main() -> int:
-    server = "localhost"
-    port = 3334
-
-    log("Starting ANITE / Propsim connection test")
-
     try:
-        sock = connect_socket(server, port)
-        log(f"Connected to {server}:{port}")
+        sock = connect()
 
-        send_command(sock, "*IDN?")
-        response = read_response(sock)
+        # Open emulation
+        send(sock, f"CALC:FILT:FILE {EMULATION_PATH}")
+        check_error(sock)
 
-        log(f"Received response: {response}")
+        # Run emulation
+        send(sock, "DIAG:SIMU:GO")
+        check_error(sock)
+
+        log("Emulation is running")
 
         sock.close()
-        log("Connection closed successfully")
-
+        log("Connection closed")
         return 0
 
     except Exception as e:
-        log(f"ERROR: {str(e)}")
+        log(f"ERROR: {e}")
         return 1
 
 

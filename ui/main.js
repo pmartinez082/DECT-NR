@@ -4,14 +4,16 @@ const path = require('path');
 const fs = require('fs');
 
 
-
-
 let win;
 let serverPort = null;
 let clientPort = null;
 let serverTimer = null;
 let serverResetDone = false;
 let clientResetDone = false;
+
+// Port open/closing state flags to prevent race conditions
+let serverPortOpen = false;
+let clientPortOpen = false;
 
 // Buffers to accumulate serial fragments so we can extract full "pdc,..." records
 let serverBuffer = '';
@@ -28,7 +30,7 @@ let serverStopAckResolve = null;
 // Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
 const PDC_RE = /p[dc]c(?:_err)?\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+/gi;
 
-const CSV_PATH = path.join(__dirname, 'output', 'server_output.csv');
+const CSV_PATH = path.join(__dirname, 'output', 'anite_AWGN_corrected.csv');
 
 /* ===================== UTIL ===================== */
 
@@ -220,36 +222,60 @@ app.whenReady().then(() => {
 
 /* ===================== UART HELPERS ===================== */
 function resetBoard(portPath, tag, doneCallback) {
-  log(`[${tag}] Performing one-time reset`);
+  const maxRetries = 3;
+  let retryCount = 0;
 
-  const port = new SerialPort({
-    path: portPath,
-    baudRate: 115200,
-    autoOpen: false
-  });
+  function attemptReset() {
+    log(`[${tag}] Attempting reset (attempt ${retryCount + 1}/${maxRetries})`);
 
-  port.open(err => {
-    if (err) {
-      log(`[${tag}] Reset open failed: ${err.message}`);
-      return;
-    }
+    const port = new SerialPort({
+      path: portPath,
+      baudRate: 115200,
+      autoOpen: false
+    });
 
-    try {
-      port.set({ dtr: false });
-      setTimeout(() => {
-        port.set({ dtr: true });
-      }, 100);
-    } catch (e) {
-      log(`[${tag}] Reset failed`);
-    }
+    port.open(err => {
+      if (err) {
+        retryCount++;
+        if (retryCount < maxRetries) {
+          log(`[${tag}] Reset open failed: ${err.message}, retrying in 500ms...`);
+          setTimeout(attemptReset, 500);
+        } else {
+          log(`[${tag}] Reset open failed after ${maxRetries} attempts: ${err.message}`);
+          doneCallback();
+        }
+        return;
+      }
 
-    setTimeout(() => {
-      port.close(() => {
-        log(`[${tag}] Reset complete`);
-        doneCallback();
-      });
-    }, 300);
-  });
+      log(`[${tag}] Reset port opened, toggling DTR`);
+      try {
+        port.set({ dtr: false }, (err) => {
+          if (err) log(`[${tag}] DTR false failed: ${err.message}`);
+          
+          setTimeout(() => {
+            port.set({ dtr: true }, (err) => {
+              if (err) log(`[${tag}] DTR true failed: ${err.message}`);
+
+              setTimeout(() => {
+                port.close((err) => {
+                  if (err) log(`[${tag}] Reset port close failed: ${err.message}`);
+                  log(`[${tag}] Reset complete`);
+                  doneCallback();
+                });
+              }, 300);
+            });
+          }, 100);
+        });
+      } catch (e) {
+        log(`[${tag}] Reset DTR toggle failed: ${e.message}`);
+        port.close(() => {
+          doneCallback();
+        });
+      }
+    });
+  }
+
+  attemptReset();
 }
 
 
@@ -266,9 +292,15 @@ function openSerial(portPath, tag, onData) {
   port.open(err => {
     if (err) {
       log(`[${tag}] ERROR opening port: ${err.message}`);
+      // Try to mark port as not open
+      if (tag === 'SERVER') serverPortOpen = false;
+      if (tag === 'CLIENT') clientPortOpen = false;
       return;
     }
-    log(`[${tag}] Serial port opened`);
+    log(`[${tag}] Serial port opened successfully`);
+    // Set the open flag here as well
+    if (tag === 'SERVER') serverPortOpen = true;
+    if (tag === 'CLIENT') clientPortOpen = true;
   });
 
 port.on('data', data => {
@@ -285,6 +317,14 @@ port.on('data', data => {
 
   port.on('close', () => {
     log(`[${tag}] Serial port closed`);
+    if (tag === 'SERVER') {
+      serverPortOpen = false;
+      serverPort = null;
+    }
+    if (tag === 'CLIENT') {
+      clientPortOpen = false;
+      clientPort = null;
+    }
     // If we had a pending stop ack wait, resolve it (we're closed so proceed)
     if (tag === 'SERVER' && serverStopAckResolve) {
       log('[SERVER] Port closed while waiting for stop ack - resolving wait');
@@ -298,6 +338,11 @@ port.on('data', data => {
     }
   });
 
+  port.on('open', () => {
+    if (tag === 'SERVER') serverPortOpen = true;
+    if (tag === 'CLIENT') clientPortOpen = true;
+  });
+
   return port;
 }
 
@@ -307,12 +352,21 @@ port.on('data', data => {
 /* ===================== STOP HELPERS ===================== */
 
 function stopClientInternal() {
-  if (!clientPort) {
-    log('[CLIENT] Already stopped');
+  if (!clientPort || !clientPortOpen) {
+    log('[CLIENT] Already stopped or port not open');
+    clientPort = null;
+    clientPortOpen = false;
     return;
   }
 
   log('[CLIENT] Stopping client');
+
+  // Clear buffers on stop
+  clientBuffer = '';
+  clientLastPdcAt = 0;
+
+  // Immediately mark port as closing to prevent other operations
+  clientPortOpen = false;
 
   // Pause briefly to let rapid output settle before sending stop command
   setTimeout(() => {
@@ -361,7 +415,7 @@ function executeClientStopWaitAndReset() {
 
 function performClientDtrReset() {
   if (!clientPort) {
-    log('[CLIENT] Port already closed, skipping DTR reset');
+    log('[CLIENT] Port already null, skipping DTR reset');
     return;
   }
 
@@ -369,58 +423,88 @@ function performClientDtrReset() {
     const portPath = clientPort.path;
     log('[CLIENT] Performing DTR reset');
 
-    clientPort.set({ dtr: false });
-    setTimeout(() => {
-      if (!clientPort) return;
-      clientPort.set({ dtr: true });
-
-      // Wait a bit, then close port and perform a reset using a fresh open
+    clientPort.set({ dtr: false }, (err) => {
+      if (err) {
+        log('[CLIENT] DTR set false failed: ' + err.message);
+        return;
+      }
+      
       setTimeout(() => {
         if (!clientPort) return;
-        clientPort.close(() => {
-          log('[CLIENT] Closed');
-          // Ensure the board is reset by opening a fresh port and toggling DTR
-          resetBoard(portPath, 'CLIENT_STOP', () => {
-            log('[CLIENT] Reset after stop complete');
-          });
-        });
-        clientPort = null;
-      }, 200);
+        clientPort.set({ dtr: true }, (err) => {
+          if (err) {
+            log('[CLIENT] DTR set true failed: ' + err.message);
+          }
 
-    }, 100);
+          // Wait a bit, then close port
+          setTimeout(() => {
+            if (!clientPort) return;
+            clientPort.close((err) => {
+              if (err) {
+                log('[CLIENT] Close failed: ' + err.message);
+              } else {
+                log('[CLIENT] Closed');
+              }
+              clientPort = null;
+              clientPortOpen = false;
+              
+              // Ensure the board is reset by opening a fresh port and toggling DTR
+              resetBoard(portPath, 'CLIENT_STOP', () => {
+                log('[CLIENT] Reset after stop complete');
+              });
+            });
+          }, 200);
+        });
+      }, 100);
+    });
   } catch (e) {
     log('[CLIENT] DTR reset failed: ' + e.message);
     // fallback: just close and attempt a reset
     try {
       const portPath = clientPort ? clientPort.path : null;
-      clientPort.close(() => {
-        log('[CLIENT] Closed');
-        if (portPath) {
-          resetBoard(portPath, 'CLIENT_STOP', () => {
-            log('[CLIENT] Reset after stop complete');
-          });
-        }
-      });
+      if (clientPort) {
+        clientPort.close((err) => {
+          if (err) log('[CLIENT] Close failed: ' + err.message);
+          log('[CLIENT] Closed');
+          clientPort = null;
+          clientPortOpen = false;
+          if (portPath) {
+            resetBoard(portPath, 'CLIENT_STOP', () => {
+              log('[CLIENT] Reset after stop complete');
+            });
+          }
+        });
+      }
     } catch (err) {
-      log('[CLIENT] Close failed: ' + err.message);
+      log('[CLIENT] Fallback close failed: ' + err.message);
+      clientPort = null;
+      clientPortOpen = false;
     }
-    clientPort = null;
   }
 }
 
 function stopServerInternal() {
-  if (!serverPort) {
-    log('[SERVER] Already stopped');
+  if (!serverPort || !serverPortOpen) {
+    log('[SERVER] Already stopped or port not open');
+    serverPort = null;
+    serverPortOpen = false;
     return;
   }
 
   log('[SERVER] Stopping server');
+
+  // Clear buffers on stop
+  serverBuffer = '';
+  serverLastPdcAt = 0;
 
   // Stop periodic timer first
   if (serverTimer) {
     clearInterval(serverTimer);
     serverTimer = null;
   }
+
+  // Immediately mark port as closing to prevent other operations
+  serverPortOpen = false;
 
   // Stop client first
   stopClientInternal();
@@ -472,7 +556,7 @@ function executeServerStopWaitAndReset() {
 
 function performServerDtrReset() {
   if (!serverPort) {
-    log('[SERVER] Port already closed, skipping DTR reset');
+    log('[SERVER] Port already null, skipping DTR reset');
     return;
   }
 
@@ -480,43 +564,63 @@ function performServerDtrReset() {
     const portPath = serverPort.path;
     log('[SERVER] Performing DTR reset');
 
-    serverPort.set({ dtr: false });
-    setTimeout(() => {
-      if (!serverPort) return;
-      serverPort.set({ dtr: true });
-
+    serverPort.set({ dtr: false }, (err) => {
+      if (err) {
+        log('[SERVER] DTR set false failed: ' + err.message);
+        return;
+      }
+      
       setTimeout(() => {
         if (!serverPort) return;
-        serverPort.close(() => {
-          log('[SERVER] Closed');
-          // Ensure the board is reset by performing an explicit reset
-          resetBoard(portPath, 'SERVER_STOP', () => {
-            log('[SERVER] Reset after stop complete');
-          });
-        });
-        serverPort = null;
-      }, 200);
+        serverPort.set({ dtr: true }, (err) => {
+          if (err) {
+            log('[SERVER] DTR set true failed: ' + err.message);
+          }
 
-    }, 100);
+          setTimeout(() => {
+            if (!serverPort) return;
+            serverPort.close((err) => {
+              if (err) {
+                log('[SERVER] Close failed: ' + err.message);
+              } else {
+                log('[SERVER] Closed');
+              }
+              serverPort = null;
+              serverPortOpen = false;
+              
+              // Ensure the board is reset by performing an explicit reset
+              resetBoard(portPath, 'SERVER_STOP', () => {
+                log('[SERVER] Reset after stop complete');
+              });
+            });
+          }, 200);
+        });
+      }, 100);
+    });
   } catch (e) {
     log('[SERVER] DTR reset failed: ' + e.message);
     // fallback: try closing and then reset using the path
     try {
       const portPath = serverPort ? serverPort.path : null;
-      serverPort.close(() => {
-        log('[SERVER] Closed');
-        if (portPath) {
-          resetBoard(portPath, 'SERVER_STOP', () => {
-            log('[SERVER] Reset after stop complete');
-          });
-        }
-      });
+      if (serverPort) {
+        serverPort.close((err) => {
+          if (err) log('[SERVER] Close failed: ' + err.message);
+          log('[SERVER] Closed');
+          serverPort = null;
+          serverPortOpen = false;
+          if (portPath) {
+            resetBoard(portPath, 'SERVER_STOP', () => {
+              log('[SERVER] Reset after stop complete');
+            });
+          }
+        });
+      }
     } catch (err) {
-      log('[SERVER] Close failed: ' + err.message);
+      log('[SERVER] Fallback close failed: ' + err.message);
+      serverPort = null;
+      serverPortOpen = false;
     }
-    serverPort = null;
   }
-
 }
 
 /* ===================== SERVER ===================== */
@@ -545,17 +649,41 @@ ipcMain.on('stop-server', () => {
 });
 
 function startServerAfterReset(event, serial, snr) {
-  if (serverPort) {
-    
+  // If a server port already exists, stop it and try again
+  if (serverPort && serverPortOpen) {
+    log('[SERVER] Server already running, stopping first');
     stopServerInternal();
-    serverPort = null;
-    startServerAfterReset(event, serial, snr);
+    // Wait a moment for cleanup before retrying
+    setTimeout(() => {
+      startServerAfterReset(event, serial, snr);
+    }, 500);
     return;
   }
 
+  // Clear old references
+  serverPort = null;
+  serverPortOpen = false;
 
+  // Clear buffers before starting fresh
+  serverBuffer = '';
+  serverLastPdcAt = 0;
 
-serverPort = openSerial(serial, 'SERVER', data => {
+  // Parse SNR as integer with validation
+  const snrValue = parseInt(snr, 10);
+  if (isNaN(snrValue)) {
+    log('[SERVER] Invalid SNR value: ' + snr);
+    return;
+  }
+
+  log(`[SERVER] Opening new port for perf command with SNR=${snrValue}`);
+
+  serverPort = openSerial(serial, 'SERVER', data => {
+    // Only process if port is still open
+    if (!serverPortOpen) {
+      log('[SERVER] Received data but port is marked as closed, ignoring');
+      return;
+    }
+
     // data is raw chunk (string), use buffering to extract full pdc records
     const matches = processIncomingChunkForBuffer('server', data);
     if (matches && matches.length > 0) {
@@ -563,26 +691,38 @@ serverPort = openSerial(serial, 'SERVER', data => {
     }
 
     // Optionally: show non-pdc cleaned lines in the debug output (for visibility)
+    /*
     const cleaned = stripAnsi(data);
     const otherLines = cleaned.split('\n').map(l => l.trim()).filter(l => l && !/p[dc]c(?:_err)?\s*,/i.test(l));
     if (otherLines.length) {
       otherLines.forEach(l => log(`[SERVER] INFO: ${l}`));
-    }
-
+  }
+*/
+  
     // Also check cleaned output for stop ack phrases (normalized)
     checkForStopAck('server');
-});
+  });
+
+  // Wait a bit for port to be fully open before sending command
+  setTimeout(() => {
+    sendServerCmd();
+  }, 100);
 
   function sendServerCmd() {
-    if (!serverPort) return;
+    if (!serverPort || !serverPortOpen) {
+      log('[SERVER] Port not ready when trying to send perf command');
+      return;
+    }
 
-    const cmd = `dect perf -s -p ${snr} -t 100\n`;
+    const cmd = `dect perf -s -p ${snrValue}\n`;
     log(`[SERVER] TX: ${cmd.trim()}`);
-    serverPort.write(cmd);
+    serverPort.write(cmd, (err) => {
+      if (err) {
+        log(`[SERVER] Write failed: ${err.message}`);
+      }
+    });
   }
-
-  sendServerCmd();
-  serverTimer = setInterval(sendServerCmd, 110000);
+  
 }
 
 
@@ -604,14 +744,41 @@ ipcMain.on('start-client', (event, { serial, mcs }) => {
 
 
 function startClientAfterReset(event, serial, mcs) {
-  if (clientPort) {
+  // If a client port already exists, stop it and try again
+  if (clientPort && clientPortOpen) {
+    log('[CLIENT] Client already running, stopping first');
     stopClientInternal();
-    clientPort = null;
-    startClientAfterReset(event, serial, mcs);
+    // Wait a moment for cleanup before retrying
+    setTimeout(() => {
+      startClientAfterReset(event, serial, mcs);
+    }, 500);
     return;
   }
 
+  // Clear old references
+  clientPort = null;
+  clientPortOpen = false;
+
+  // Clear buffers before starting fresh
+  clientBuffer = '';
+  clientLastPdcAt = 0;
+
+  // Parse MCS as integer with validation
+  const mcsValue = parseInt(mcs, 10);
+  if (isNaN(mcsValue)|| mcsValue < 1 || mcsValue > 4) {
+    log('[CLIENT] Invalid MCS value: ' + mcs);
+    return;
+  }
+
+  log(`[CLIENT] Opening new port for perf command with MCS=${mcsValue}`);
+
   clientPort = openSerial(serial, 'CLIENT', data => {
+    // Only process if port is still open
+    if (!clientPortOpen) {
+      log('[CLIENT] Received data but port is marked as closed, ignoring');
+      return;
+    }
+
     // Use buffering and extraction for client side too if you expect pdc records
     const matches = processIncomingChunkForBuffer('client', data);
     if (matches && matches.length) {
@@ -634,9 +801,25 @@ function startClientAfterReset(event, serial, mcs) {
     checkForStopAck('client');
   });
 
-  const cmd = `dect perf -c --c_tx_mcs ${mcs} -t 10000\n`;
-  log(`[CLIENT] TX: ${cmd.trim()}`);
-  clientPort.write(cmd);
+  // Wait a bit for port to be fully open before sending command
+  setTimeout(() => {
+    sendClientCmd();
+  }, 100);
+
+  function sendClientCmd() {
+    if (!clientPort || !clientPortOpen) {
+      log('[CLIENT] Port not ready when trying to send perf command');
+      return;
+    }
+
+    const cmd = `dect perf -c --c_tx_mcs ${mcsValue} --c_tx_pwr -20 -t 10000\n`;
+    log(`[CLIENT] TX: ${cmd.trim()}`);
+    clientPort.write(cmd, (err) => {
+      if (err) {
+        log(`[CLIENT] Write failed: ${err.message}`);
+      }
+    });
+  }
 }
 
 

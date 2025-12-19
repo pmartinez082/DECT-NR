@@ -1800,8 +1800,8 @@ int dect_phy_perf_cmd_handle(struct dect_phy_perf_params *params)
 		return -1;
 	}
 
-	/* Set default PDC number if not set (0 means use default) */
-	if (params->pdc_number == 0) {
+	/* Set default PDC number if not set (-1 means use default) */
+	if (params->pdc_number == -1) {
 		params->pdc_number = 100;
 	}
 

@@ -1,8 +1,0 @@
-si SWD
-speed 4000
-device NRF9151_XXCA
-selectemubysn 
-connect
-rtt start
-rtt write 0 "dect perf stop\n"
-rtt read

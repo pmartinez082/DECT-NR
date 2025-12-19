@@ -8,6 +8,11 @@
 
 <body>
   <h1>DECT Control Panel</h1>
+  <!-- ================= DEBUG ================= -->
+  <div class="debug-panel">
+    <h2>Debug Log</h2>
+    <textarea id="debugLog" readonly style="width: 100%;"></textarea>
+  </div>
 
   <div class="container">
 
@@ -28,6 +33,10 @@
         type="number"
         id="snr-input"
         placeholder="Enter SNR"
+        min="0"
+        max="50"
+        step="1"
+        value="0"
       >
 
       <div class="button-row">
@@ -55,6 +64,10 @@
         type="number"
         id="mcs-input"
         placeholder="Enter MCS"
+        min="0"
+        max="10"
+        step="1"
+        value="0"
       >
 
       <div class="button-row">
@@ -66,21 +79,17 @@
     </div>
 
   </div>
-<div class="right">
-  <h2>Anite configuration</h2>
-  <button id="test-connection">Test connection</button>
-</div>
+  <div class="right">
+    <h2>Anite configuration</h2>
+    <button id="test-connection">Test connection</button>
+  </div>
   <div class="left">
     <h2>Compute metrics</h2>
     <button id="create-graph">Create graph</button>
+
     <embed id = "graph-embed" src="output/AWGN.pdf" width="100%" height="800px">
   </div>
 
-  <!-- ================= DEBUG ================= -->
-  <div class="debug-panel">
-    <h2>Debug Log</h2>
-    <textarea id="debugLog" readonly></textarea>
-  </div>
 
   <script src="renderer.js"></script>
 </body>
