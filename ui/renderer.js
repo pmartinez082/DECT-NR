@@ -56,7 +56,7 @@ window.addEventListener('DOMContentLoaded', () => {
 ipcRenderer.on('refresh-graph', () => {
   const embed = document.getElementById('graph-embed');
   // Force reload by changing the src (adding cache-busting query)
-  embed.src = `output/AWGN.pdf?cb=${new Date().getTime()}`;
+  embed.src = `output/TDL-B.pdf?cb=${new Date().getTime()}`;
 });
 
 document.getElementById('test-connection').addEventListener('click', () => {

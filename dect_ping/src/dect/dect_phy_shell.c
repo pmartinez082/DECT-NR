@@ -255,7 +255,9 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 			break;
 		}
 		case 'p': {
-			params.pdc_number = atoi(optarg);
+			/* Parse decimal input and store as integer * 100 */
+			float temp_val = strtof(optarg, NULL);
+			params.pdc_number = (uint32_t)(temp_val * 100 + 0.5f);
 			break;
 		}
 		case DECT_SHELL_PERF_DEST_SERVER_TX_ID: {

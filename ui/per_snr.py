@@ -4,7 +4,7 @@ import pandas as pd
 import csv
 
 # === Load CSV ===
-df = pd.read_csv('output/anite_AWGN_corrected.csv')
+df = pd.read_csv('output/anite_tdlc.csv')
 
 '''
 Current measurement settings:
@@ -22,18 +22,18 @@ shape = df.shape[0]
 
 df = df[df['snr'] >= 0]
 # Drop rows where mcs > 4 | mcs < 1
-df = df[df['mcs'] > 0]
-df = df[df['mcs'] < 5]
+df = df[df['mcs'] == 1]
 
 
 
 
-df.to_csv('output/anite_AWGN_corrected_clean.csv', index=False)
+
+df.to_csv('output/tdlc_clean.csv', index=False)
 # Assign packet error based on channel
-# PDC → 0, PCC → 0, PDC_ERR/PCC_ERR → 1
+# PDCC → 0 (success), PDC_ERR → 1 (error)
 df['packet_error'] = df['channel'].apply(
-    lambda x: 0 if x.upper() == 'PDC' 
-    else 1 if x.upper() in ['PDC_ERR' ] 
+    lambda x: 0 if x.upper() in ['PDC']
+    else 1 if x.upper() in ['PDC_ERR'] 
     else np.nan
 )
 
@@ -76,7 +76,7 @@ for mcs in sorted(per_data['mcs'].unique()):
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
-plt.title('AWGN channel')
+plt.title('TDL-C channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')  # <<< Make y-axis logarithmic
 
@@ -100,11 +100,11 @@ csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))
 csv_data = [csv_header] + csv_data_rows
 
 # Save and show
-plt.savefig('output/AWGN.pdf', format='pdf')
+plt.savefig('output/TDL-C.pdf', format='pdf')
 
 
 # Save CSV data
-with open('output/statistics_AWGN.csv', 'w', newline='') as csvfile:
+with open('output/statistics_tdlc.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(csv_data)
 

@@ -1519,7 +1519,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PCC_ERR,%d,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
+			desh_print("PCC_ERR,%u.%02u,%d,%d", cmd_params->pdc_number/100, cmd_params->pdc_number%100, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PDC_CRC_ERROR: {
@@ -1537,7 +1537,7 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PDC_ERR,%d,%d,%d", cmd_params->pdc_number, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
+			desh_print("PDC_ERR,%u.%02u,%d,%d", cmd_params->pdc_number/100, cmd_params->pdc_number%100, perf_data.rx_metrics.rx_latest_mcs, params->crc_failure.snr);
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PCC: {
@@ -1800,9 +1800,9 @@ int dect_phy_perf_cmd_handle(struct dect_phy_perf_params *params)
 		return -1;
 	}
 
-	/* Set default PDC number if not set (-1 means use default) */
-	if (params->pdc_number == -1) {
-		params->pdc_number = 100;
+	/* Set default PDC number if not set (0 means use default) */
+	if (params->pdc_number == 0) {
+		params->pdc_number = 10000; /* 100.00 */
 	}
 
 	dect_phy_perf_phy_init();
@@ -1900,7 +1900,7 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
 		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
-		desh_print("pdc,%d,%d,%d",perf_data.cmd_params.pdc_number,perf_data.rx_metrics.rx_latest_mcs, params->snr);
+		desh_print("pdc,%u.%02u,%d,%d",perf_data.cmd_params.pdc_number/100,perf_data.cmd_params.pdc_number%100,perf_data.rx_metrics.rx_latest_mcs, params->snr);
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
 		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
 			//desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);

@@ -27,10 +27,16 @@ let clientLastPdcAt = 0;
 let clientStopAckResolve = null;
 let serverStopAckResolve = null;
 
-// Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
-const PDC_RE = /p[dc]c(?:_err)?\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+/gi;
+// Periodic server/client loop control
+let serverClientLoopTimer = null;
+let serverClientLoopEvent = null;
+let serverClientLoopParams = null;
 
-const CSV_PATH = path.join(__dirname, 'output', 'anite_AWGN_corrected.csv');
+// Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
+// Updated to support decimals in first number: pdc,99.50,mcs,snr
+const PDC_RE = /p[dc]c(?:_err)?\s*,\s*\d+(?:\.\d+)?\s*,\s*\d+\s*,\s*\d+/gi;
+
+const CSV_PATH = path.join(__dirname, 'output', 'anite_tdlb.csv');
 
 /* ===================== UTIL ===================== */
 
@@ -46,8 +52,8 @@ function handlePdcRecords(records, event) {
   records.forEach(r => {
     const normalized = r.replace(/\s+/g, '').toLowerCase();
     // Send to UI (preserve newline at end for display)
-    if (event) event.sender.send('server-output', normalized + '\n');
-    log(`[SERVER] RX: ${normalized}`);
+    // if (event) event.sender.send('server-output', normalized + '\n');
+   // log(`[SERVER] RX: ${normalized}`);
     // Append to CSV with newline
     try {
       fs.appendFileSync(CSV_PATH, normalized + '\n');
@@ -307,7 +313,7 @@ port.on('data', data => {
     // Pass raw data (string) to the handler and let the handler perform
     // buffering and extraction so we don't lose fragments across chunks.
     const raw = data.toString();
-    log(`[${tag}] RX RAW: ${raw.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}`);
+   // log(`[${tag}] RX RAW: ${raw.replace(/\n/g, '\\n').replace(/\r/g, '\\r')}`);
     onData(raw);
 });
 
@@ -645,8 +651,76 @@ ipcMain.on('start-server', (event, { serial, snr }) => {
 
 ipcMain.on('stop-server', () => {
   log('[SERVER] Stop requested manually');
+  stopServerClientLoop();
   stopServerInternal();
 });
+
+/* ===================== PERIODIC SERVER/CLIENT LOOP ===================== */
+
+function stopServerClientLoop() {
+  if (serverClientLoopTimer) {
+    clearInterval(serverClientLoopTimer);
+    serverClientLoopTimer = null;
+    log('[LOOP] Periodic server/client loop stopped');
+  }
+}
+
+function executeServerClientLoopCycle() {
+  if (!serverClientLoopEvent || !serverClientLoopParams) {
+    log('[LOOP] Loop parameters missing, stopping loop');
+    stopServerClientLoop();
+    return;
+  }
+
+  const { serial_server, snr, serial_client, mcs } = serverClientLoopParams;
+  
+  log('[LOOP] === CYCLE START: Stopping server ===');
+  stopServerInternal();
+
+  // Wait 5 seconds, then restart
+  setTimeout(() => {
+    log('[LOOP] === Restarting server and client after 5s ===');
+    
+    // Start server
+    serverClientLoopEvent.sender.send('start-server', { serial: serial_server, snr });
+    
+    // Start client
+    setTimeout(() => {
+      serverClientLoopEvent.sender.send('start-client', { serial: serial_client, mcs });
+    }, 500);
+  }, 5000);
+}
+
+ipcMain.on('start-server-client-loop', (event, { serial_server, snr, serial_client, mcs }) => {
+  log('[LOOP] Start periodic server/client loop requested');
+  
+  // Stop any existing loop
+  stopServerClientLoop();
+  
+  // Store parameters and event for later use
+  serverClientLoopEvent = event;
+  serverClientLoopParams = { serial_server, snr, serial_client, mcs };
+  
+  // Start initial server and client
+  event.sender.send('start-server', { serial: serial_server, snr });
+  setTimeout(() => {
+    event.sender.send('start-client', { serial: serial_client, mcs });
+  }, 500);
+  
+  // Set up periodic cycle: every 60 seconds, stop and restart
+  serverClientLoopTimer = setInterval(() => {
+    executeServerClientLoopCycle();
+  }, 60000);
+  
+  log('[LOOP] Periodic loop started (60-second cycle)');
+});
+
+ipcMain.on('stop-server-client-loop', () => {
+  log('[LOOP] Stop periodic server/client loop requested');
+  stopServerClientLoop();
+  stopServerInternal();
+});
+
 
 function startServerAfterReset(event, serial, snr) {
   // If a server port already exists, stop it and try again
@@ -669,7 +743,7 @@ function startServerAfterReset(event, serial, snr) {
   serverLastPdcAt = 0;
 
   // Parse SNR as integer with validation
-  const snrValue = parseInt(snr, 10);
+  const snrValue = parseFloat(snr, 10);
   if (isNaN(snrValue)) {
     log('[SERVER] Invalid SNR value: ' + snr);
     return;
@@ -719,8 +793,10 @@ function startServerAfterReset(event, serial, snr) {
     serverPort.write(cmd, (err) => {
       if (err) {
         log(`[SERVER] Write failed: ${err.message}`);
+        event.sender.send('server-output', `Error: command write failed: ${err.message}`);
       }
     });
+    event.sender.send('server-output', `Success: command sent: ${cmd}`);
   }
   
 }
