@@ -6,7 +6,7 @@ SERVER_IP = "192.168.1.1"
 SERVER_PORT = 3334
 TIMEOUT = 10
 
-EMULATION_PATH = r'"D:\User Emulations\ChannelSounder\DECT-AWGN.smu"'
+EMULATION_PATH = 'D:\\User Emulations\\ChannelSounder\\DECT-AWGN.smu'
 
 
 
@@ -45,6 +45,22 @@ def check_error(sock: socket.socket) -> None:
     log(f"<<< SYST:ERR? → {err}")
     if not err.startswith("0"):
         raise RuntimeError(err)
+def set_snr(sock: socket.socket,
+                     channel: int,
+                     interferer: int,
+                     profile: str,
+                     snr_db: float) -> None:
+    """
+    Configure interference generator for a given channel.
+    """
+
+    # Set interference profile
+    send(sock, f"CALC:CHAN{channel}:INT{interferer}:PROF {profile}")
+    check_error(sock)
+
+    # Set SNR
+    send(sock, f"CALC:CHAN{channel}:INT{interferer}:SNR {snr_db}")
+    check_error(sock)
 
 
 def main() -> int:
@@ -52,8 +68,10 @@ def main() -> int:
         sock = connect()
 
         # Open emulation
-        send(sock, f"CALC:FILT:FILE {EMULATION_PATH}")
+        send(sock, f"CALCulate:FILTer:FILE {EMULATION_PATH}")
         check_error(sock)
+
+       
 
         # Run emulation
         send(sock, "DIAG:SIMU:GO")
@@ -61,8 +79,21 @@ def main() -> int:
 
         log("Emulation is running")
 
-        sock.close()
-        log("Connection closed")
+        set_snr(sock, channel=1677, interferer=1, profile="AWGN", snr_db=10)
+        check_error(sock)
+
+
+
+        # Stop emulation
+        send(sock, "DIAG:SIMU:STOP")
+        #check_error(sock)
+
+      
+
+        # Close connection
+       # sock.close()
+        #log("Connection closed")
+       
         return 0
 
     except Exception as e:
@@ -72,3 +103,15 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+'''
+NOTES
+
+
+OUTPut:INTERFerence:EBN0:SET <interference identification>,<Eb/N0>
+SNR = Eb/N0 (dB) + 10log(datarate/noise bandwidth)
+noise bandwidth = 1.539 MHz
+datarate = 50 kbps
+Eb/N0 = SNR - 10log(50e3/1.539e6)
+
+'''

@@ -3,8 +3,10 @@ import numpy as np
 import pandas as pd
 import csv
 
+file_name = "anite_TDLB"
+
 # === Load CSV ===
-df = pd.read_csv('output/anite_tdlc.csv')
+df = pd.read_csv('measurements/' + file_name + '.csv')
 
 '''
 Current measurement settings:
@@ -26,9 +28,7 @@ df = df[df['mcs'] == 1]
 
 
 
-
-
-df.to_csv('output/tdlc_clean.csv', index=False)
+df.to_csv('output/cleaned/' + file_name + '_clean.csv', index=False)
 # Assign packet error based on channel
 # PDCC → 0 (success), PDC_ERR → 1 (error)
 df['packet_error'] = df['channel'].apply(
@@ -76,7 +76,7 @@ for mcs in sorted(per_data['mcs'].unique()):
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
-plt.title('TDL-C channel')
+plt.title(file_name.split('_')[1] + ' channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')  # <<< Make y-axis logarithmic
 
@@ -100,11 +100,11 @@ csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))
 csv_data = [csv_header] + csv_data_rows
 
 # Save and show
-plt.savefig('output/TDL-C.pdf', format='pdf')
+plt.savefig('output/graphs/' + file_name + '.pdf', format='pdf')
 
 
 # Save CSV data
-with open('output/statistics_tdlc.csv', 'w', newline='') as csvfile:
+with open('output/stats/statistics_' + file_name.lower() + '.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(csv_data)
 
