@@ -6,7 +6,7 @@ import csv
 file_name = "anite_TDLB"
 
 # === Load CSV ===
-df = pd.read_csv('measurements/' + file_name + '.csv')
+df = pd.read_csv('./measurements/' + file_name + '.csv')
 
 '''
 Current measurement settings:
@@ -14,39 +14,56 @@ Current measurement settings:
 - slot gap count: 2
 - subslot gap count: 0
 - channel: 1677
-- power = -20 dBm'''
+- power = -20 dBm
+'''
 
 # === Clean data ===
 df.columns = df.columns.str.lower()
 
-shape = df.shape[0]
+# === Sort by sequence number ===
+df = df.sort_values('seq_number').reset_index(drop=True)
 
+original_shape = df.shape[0]
 
+# === Detect missing sequence numbers ===
+seq = df['seq_number'].dropna().astype(int)
+
+missing_seq_count = 0
+if not seq.empty:
+    expected_seq = np.arange(seq.min(), seq.max() + 1)
+    missing_seq_count = len(set(expected_seq) - set(seq))
+
+print("Missing sequence numbers:", missing_seq_count)
+
+# === Apply filters ===
 df = df[df['snr'] >= 0]
-# Drop rows where mcs > 4 | mcs < 1
 df = df[df['mcs'] == 1]
 
-
-
+# Save cleaned CSV
 df.to_csv('output/cleaned/' + file_name + '_clean.csv', index=False)
-# Assign packet error based on channel
-# PDCC → 0 (success), PDC_ERR → 1 (error)
+
+# === Assign packet error based on channel ===
+# PDC → 0 (success), PDC_ERR → 1 (error)
 df['packet_error'] = df['channel'].apply(
-    lambda x: 0 if x.upper() in ['PDC']
-    else 1 if x.upper() in ['PDC_ERR'] 
+    lambda x: 0 if str(x).upper() == 'PDC'
+    else 1 if str(x).upper() == 'PDC_ERR'
     else np.nan
 )
 
-
-# Drop rows where packet_error is NaN (unexpected channel names)
+# Drop rows with unexpected channel names
 df = df.dropna(subset=['packet_error'])
 
+# === Add virtual packet errors for missing sequence numbers ===
+if missing_seq_count > 0:
+    virtual_errors = pd.DataFrame({
+        'snr': [df['snr'].median()] * missing_seq_count,
+        'mcs': [df['mcs'].mode()[0]] * missing_seq_count,
+        'packet_error': [1] * missing_seq_count
+    })
 
+    df = pd.concat([df, virtual_errors], ignore_index=True)
 
-
-print("Dropped rows:", shape - df.shape[0])
-
-
+print("Dropped rows:", original_shape - df.shape[0])
 
 # === Compute PER per SNR per MCS ===
 per_data = (
@@ -56,55 +73,63 @@ per_data = (
     .rename(columns={'packet_error': 'per'})
 )
 
-
 # === Plot ===
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(8, 6))
 
 for mcs in sorted(per_data['mcs'].unique()):
     mcs_data = per_data[per_data['mcs'] == mcs].sort_values('snr')
     if mcs_data.empty:
         continue
 
-    # Scatter points
-    plt.scatter(mcs_data['snr'], mcs_data['per'], marker='o', s=20, alpha=0.6, label=f'MCS {mcs}')
+    plt.scatter(
+        mcs_data['snr'],
+        mcs_data['per'],
+        marker='o',
+        s=20,
+        alpha=0.6,
+        label=f'MCS {mcs}'
+    )
 
-    # Connect the dots
-    plt.plot(mcs_data['snr'], mcs_data['per'], linewidth=2)
-
-
-
+    plt.plot(
+        mcs_data['snr'],
+        mcs_data['per'],
+        linewidth=2
+    )
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
 plt.title(file_name.split('_')[1] + ' channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
-plt.yscale('log')  # <<< Make y-axis logarithmic
+plt.yscale('log')
 
-# Only create legend if there are artists with labels
 handles, labels = plt.gca().get_legend_handles_labels()
 if handles:
     plt.legend(title='MCS')
+
 plt.tight_layout()
-
-
-
-
-csv_data = [['SNR(dB)', 'MCS', 'Current Samples' ]]
-for _, row in per_data.iterrows():
-        csv_data.append([row['snr'], int(row['mcs']), int(df[(df['snr'] == row['snr']) & (df['mcs'] == row['mcs'])].shape[0])])
-
-# sort csv_data by MCS and SNR
-csv_header = csv_data[0]
-csv_data_rows = csv_data[1:]
-csv_data_rows = sorted(csv_data_rows, key=lambda x: (int(x[2]), float(x[0])))
-csv_data = [csv_header] + csv_data_rows
-
-# Save and show
 plt.savefig('output/graphs/' + file_name + '.pdf', format='pdf')
 
+# === Export statistics CSV ===
+csv_data = [['SNR(dB)', 'MCS', 'Current Samples']]
 
-# Save CSV data
+for _, row in per_data.iterrows():
+    sample_count = df[
+        (df['snr'] == row['snr']) &
+        (df['mcs'] == row['mcs'])
+    ].shape[0]
+
+    csv_data.append([
+        row['snr'],
+        int(row['mcs']),
+        int(sample_count)
+    ])
+
+# Sort by sample count then SNR
+csv_header = csv_data[0]
+csv_rows = csv_data[1:]
+csv_rows = sorted(csv_rows, key=lambda x: (int(x[2]), float(x[0])))
+csv_data = [csv_header] + csv_rows
+
 with open('output/stats/statistics_' + file_name.lower() + '.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(csv_data)
-

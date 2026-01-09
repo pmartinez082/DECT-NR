@@ -190,6 +190,8 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	int long_index = 0;
 	int opt;
 	int temp;
+	bool c_slots_set = false;
+	bool c_gap_slots_set = false;
 
 	if (argc < 2) {
 		goto show_usage;
@@ -283,10 +285,12 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 				goto show_usage;
 			}
 			params.slot_count = ret;
+			c_slots_set = true;
 			break;
 		}
 		case DECT_SHELL_PERF_SLOT_GAP_COUNT: {
 			params.slot_gap_count = atoi(optarg);
+			c_gap_slots_set = true;
 			break;
 		}
 		case DECT_SHELL_PERF_SUBSLOT_GAP_COUNT: {
@@ -352,6 +356,35 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	if (params.role == DECT_PHY_COMMON_ROLE_NONE) {
 		desh_error("At least role need to be given. See usage:");
 		goto show_usage;
+	}
+
+	/* Apply MCS-based defaults for c_slots (CLIENT only) if not explicitly set */
+	if (params.role == DECT_PHY_COMMON_ROLE_CLIENT) {
+		struct {
+			int mcs;
+			int min_slot;
+			int max_slot;
+		} client_mcs_defaults[] = {
+			{0, 2, 16},
+			{1, 1, 16},
+			{2, 1, 15},
+			{3, 1, 11},
+			{4, 1, 8},
+		};
+		int mcs_count = sizeof(client_mcs_defaults) / sizeof(client_mcs_defaults[0]);
+
+		/* Look up defaults based on MCS */
+		for (int i = 0; i < mcs_count; i++) {
+			if (client_mcs_defaults[i].mcs == params.tx_mcs) {
+				if (!c_slots_set) {
+					params.slot_count = client_mcs_defaults[i].min_slot;
+				}
+				desh_print("CLIENT MCS %d: c_slots=%d (range: %d-%d)",
+					   params.tx_mcs, params.slot_count, 
+					   client_mcs_defaults[i].min_slot, client_mcs_defaults[i].max_slot);
+				break;
+			}
+		}
 	}
 
 	if (params.subslot_gap_count) {

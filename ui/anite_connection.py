@@ -1,18 +1,37 @@
+import math
 import socket
 import sys
 from datetime import datetime
+import io
+
+# Reconfigure stdout to use UTF-8 encoding with error handling
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 SERVER_IP = "192.168.1.1"
 SERVER_PORT = 3334
 TIMEOUT = 10
 
-EMULATION_PATH = 'D:\\User Emulations\\ChannelSounder\\DECT-AWGN.smu'
+EMULATION_BASE_PATH = 'D:\\User Emulations\\ChannelSounder\\'
 
+# Map emulation types to filenames
+EMULATION_FILES = {
+    'TDL-A': 'DECT-TDL-A.smu',
+    'TDL-B': 'DECT-TDL-B.smu',
+    'TDL-C': 'DECT-TDL-C.smu',
+    'AWGN': 'DECT-AWGN.smu'
+}
 
 
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[ANITE][{ts}] {msg}", flush=True)
+    # Encode message with error handling to avoid encoding issues on Windows console
+    try:
+        print(f"[ANITE][{ts}] {msg}", flush=True)
+    except UnicodeEncodeError:
+        # Fallback: replace problematic characters with ASCII equivalents
+        safe_msg = msg.encode('ascii', errors='replace').decode('ascii')
+        print(f"[ANITE][{ts}] {safe_msg}", flush=True)
 
 
 def connect() -> socket.socket:
@@ -45,30 +64,35 @@ def check_error(sock: socket.socket) -> None:
     log(f"<<< SYST:ERR? → {err}")
     if not err.startswith("0"):
         raise RuntimeError(err)
+    
+
 def set_snr(sock: socket.socket,
-                     channel: int,
                      interferer: int,
-                     profile: str,
                      snr_db: float) -> None:
     """
     Configure interference generator for a given channel.
     """
+    # get current datarate and noise bandwidth
+    send(sock, "OUTPut:INTERFerence:DATARate:GET? "+str(interferer))
+    datarate = float(recv_line(sock)) * 1000
+    noiseband = 1.539 * 10**6
+    ebN0 = snr_db - 10 * math.log10(datarate / noiseband)
+    send(sock, f"OUTP:INTERFerence:EBN0:SET {interferer},{ebN0}")
 
-    # Set interference profile
-    send(sock, f"CALC:CHAN{channel}:INT{interferer}:PROF {profile}")
-    check_error(sock)
+   
 
-    # Set SNR
-    send(sock, f"CALC:CHAN{channel}:INT{interferer}:SNR {snr_db}")
-    check_error(sock)
-
-
-def main() -> int:
+def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
+    sock = None
     try:
+        # Construct emulation path based on type
+        emulation_file = EMULATION_FILES.get(emulation_type, EMULATION_FILES['AWGN'])
+        emulation_path = EMULATION_BASE_PATH + emulation_file
+        log(f"Using emulation file: {emulation_path}")
+        
         sock = connect()
 
         # Open emulation
-        send(sock, f"CALCulate:FILTer:FILE {EMULATION_PATH}")
+        send(sock, f"CALCulate:FILTer:FILE {emulation_path}")
         check_error(sock)
 
        
@@ -78,40 +102,55 @@ def main() -> int:
         check_error(sock)
 
         log("Emulation is running")
+        
+        # Set SNR if provided
+        if snr_db is not None:
+            set_snr(sock, interferer=1, snr_db=snr_db)
+            check_error(sock)
+            log(f"SNR set to {snr_db} dB")
 
-        set_snr(sock, channel=1677, interferer=1, profile="AWGN", snr_db=10)
-        check_error(sock)
-
-
-
-        # Stop emulation
-        send(sock, "DIAG:SIMU:STOP")
-        #check_error(sock)
-
-      
-
-        # Close connection
-       # sock.close()
-        #log("Connection closed")
+        # Keep running until interrupted
+        log("Emulation will run until stopped externally")
+        import time
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            log("Keyboard interrupt received")
        
         return 0
 
     except Exception as e:
         log(f"ERROR: {e}")
         return 1
+    
+    finally:
+        # Always close the socket, even if an error occurred
+        if sock:
+            try:
+                log("Closing socket connection")
+                sock.close()
+                log("Connection closed")
+            except Exception as e:
+                log(f"Error closing socket: {e}")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
-
-'''
-NOTES
-
-
-OUTPut:INTERFerence:EBN0:SET <interference identification>,<Eb/N0>
-SNR = Eb/N0 (dB) + 10log(datarate/noise bandwidth)
-noise bandwidth = 1.539 MHz
-datarate = 50 kbps
-Eb/N0 = SNR - 10log(50e3/1.539e6)
-
-'''
+    snr = None
+    emulation_type = 'AWGN'
+    
+    if len(sys.argv) > 1:
+        try:
+            snr = float(sys.argv[1])
+            log(f"Starting emulation with SNR={snr} dB")
+        except ValueError:
+            log(f"Invalid SNR value: {sys.argv[1]}")
+            sys.exit(1)
+    
+    if len(sys.argv) > 2:
+        emulation_type = sys.argv[2]
+        if emulation_type not in EMULATION_FILES:
+            log(f"Invalid emulation type: {emulation_type}")
+            sys.exit(1)
+    
+    sys.exit(main(snr_db=snr, emulation_type=emulation_type))

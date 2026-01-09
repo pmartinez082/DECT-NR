@@ -1756,7 +1756,7 @@ static void dect_phy_ping_thread_fn(void)
 						mcs_to_print = ping_data.rx_metrics.rx_last_pcc_mcs;
 					}
 				}
-				desh_print("PDC_err,%d,%d", mcs_to_print, params->crc_failure.snr);
+				
                 
             }
             break;

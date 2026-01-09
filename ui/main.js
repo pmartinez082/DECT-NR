@@ -32,11 +32,38 @@ let serverClientLoopTimer = null;
 let serverClientLoopEvent = null;
 let serverClientLoopParams = null;
 
-// Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
-// Updated to support decimals in first number: pdc,99.50,mcs,snr
-const PDC_RE = /p[dc]c(?:_err)?\s*,\s*\d+(?:\.\d+)?\s*,\s*\d+\s*,\s*\d+/gi;
+// SNR Sweep control
+let sweepTimer = null;
+let sweepEvent = null;
+let sweepParams = null;
+let sweepCurrentSnr = 0;
+let sweepMaxSnr = 0;
+let sweepRunning = false;
 
-const CSV_PATH = path.join(__dirname, 'output', 'anite_tdlb.csv');
+// Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
+// Updated regex to capture complete PDC records: pdc,value,mcs,snr
+// More flexible to handle various whitespace/formatting
+const PDC_RE = /p[dc]c(?:_err)?\s*,\s*[\d.]+\s*,\s*\d+\s*,\s*\d+/gi;
+
+// Dynamic filename selection from UI
+let selectedFilename = 'TDL-A';
+
+// Get today's date in YYYY-MM-DD format for folder naming
+function getTodaysDateFolder() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `measurements_${year}-${month}-${day}`;
+}
+
+// Build CSV path with today's date
+function getCSVPath() {
+  const dateFolder = getTodaysDateFolder();
+  return path.join(__dirname, dateFolder, selectedFilename + '.csv');
+}
+
+let CSV_PATH = getCSVPath();
 
 /* ===================== UTIL ===================== */
 
@@ -47,16 +74,33 @@ function log(msg) {
   }
 }
 
+// Ensure CSV directory exists
+function ensureCSVDirectory() {
+  try {
+    CSV_PATH = getCSVPath();
+    fs.mkdirSync(path.dirname(CSV_PATH), { recursive: true });
+  } catch (err) {
+    log(`[CSV] Failed to create directory: ${err.message}`);
+  }
+}
+
 // Append an array of pdc records to CSV and send to UI/log
 function handlePdcRecords(records, event) {
+  ensureCSVDirectory();
   records.forEach(r => {
-    const normalized = r.replace(/\s+/g, '').toLowerCase();
-    // Send to UI (preserve newline at end for display)
-    // if (event) event.sender.send('server-output', normalized + '\n');
-   // log(`[SERVER] RX: ${normalized}`);
+    // Debug: log the raw string
+    log(`[CSV] Raw input: "${r}" (length: ${r.length})`);
+    
+    // Normalize for CSV: remove extra whitespace but keep comma separation
+    const normalized = r.replace(/\s+/g, ',').toLowerCase();
+    
+    // Debug: log the normalized result
+    log(`[CSV] Normalized: "${normalized}"`);
+    
     // Append to CSV with newline
     try {
       fs.appendFileSync(CSV_PATH, normalized + '\n');
+      log(`[CSV] Wrote: ${normalized}`);
     } catch (err) {
       log('[SERVER] Failed to append to CSV: ' + err.message);
     }
@@ -153,20 +197,27 @@ function processIncomingChunkForBuffer(bufferName, rawChunk) {
   if (bufferName === 'server') {
     serverBuffer += s;
     let matches = [];
-    let lastConsumed = 0;
-    let m;
-    // reset lastIndex
-    PDC_RE.lastIndex = 0;
-    while ((m = PDC_RE.exec(serverBuffer)) !== null) {
-      matches.push(m[0]);
-      lastConsumed = m.index + m[0].length;
-    }
-    if (lastConsumed > 0) {
-      serverBuffer = serverBuffer.slice(lastConsumed);
-    }
-    // Update last PDC timestamp if matches appear
+    
+    // Split by newlines and process only complete lines
+    const lines = serverBuffer.split('\n');
+    
+    // Keep the last potentially incomplete line in the buffer
+    const completeLines = lines.slice(0, -1);
+    serverBuffer = lines[lines.length - 1];
+    
+    // Test each complete line for PDC pattern
+    completeLines.forEach(line => {
+      // Use a non-global regex for testing to avoid lastIndex issues
+      const lineRegex = /^p[dc]c(?:_err)?\s*,\s*[\d.]+\s*,\s*\d+\s*,\s*\d+\s*$/i;
+      if (lineRegex.test(line.trim())) {
+        matches.push(line.trim());
+      }
+    });
+    
     if (matches.length > 0) {
       serverLastPdcAt = Date.now();
+      log(`[SERVER] Found ${matches.length} PDC records`);
+      matches.forEach(m => log(`[SERVER] Raw match: "${m}"`));
     }
 
     // Check for stop ack across chunks (normalized search that tolerates fragmentation/ANSI)
@@ -179,17 +230,23 @@ function processIncomingChunkForBuffer(bufferName, rawChunk) {
   } else {
     clientBuffer += s;
     let matches = [];
-    let lastConsumed = 0;
-    let m;
-    PDC_RE.lastIndex = 0;
-    while ((m = PDC_RE.exec(clientBuffer)) !== null) {
-      matches.push(m[0]);
-      lastConsumed = m.index + m[0].length;
-    }
-    if (lastConsumed > 0) {
-      clientBuffer = clientBuffer.slice(lastConsumed);
-    }
-    // Update last PDC timestamp if matches appear
+    
+    // Split by newlines and process only complete lines
+    const lines = clientBuffer.split('\n');
+    
+    // Keep the last potentially incomplete line in the buffer
+    const completeLines = lines.slice(0, -1);
+    clientBuffer = lines[lines.length - 1];
+    
+    // Test each complete line for PDC pattern
+    completeLines.forEach(line => {
+      // Use a non-global regex for testing to avoid lastIndex issues
+      const lineRegex = /^p[dc]c(?:_err)?\s*,\s*[\d.]+\s*,\s*\d+\s*,\s*\d+\s*$/i;
+      if (lineRegex.test(line.trim())) {
+        matches.push(line.trim());
+      }
+    });
+    
     if (matches.length > 0) {
       clientLastPdcAt = Date.now();
     }
@@ -217,8 +274,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  CSV_PATH = getCSVPath();
   fs.mkdirSync(path.dirname(CSV_PATH), { recursive: true });
   log('[APP] Starting application');
+  log(`[APP] CSV output directory: ${path.dirname(CSV_PATH)}`);
 
 
   /* ======================================= */
@@ -952,6 +1011,8 @@ ipcMain.on('create-graph', () => {
     .join('\n');
 }
 
+let emulationProcess = null;
+
 /* ===================== ANITE ===================== */
 
 ipcMain.on('test-connection', () => {
@@ -971,4 +1032,201 @@ ipcMain.on('test-connection', () => {
     
     
   });
+});
+
+ipcMain.on('start-emulation', (event, { snr, channelType }) => {
+  log(`[ANITE] Start emulation requested with SNR=${snr}, Channel=${channelType}`);
+  
+  if (emulationProcess) {
+    log('[ANITE] Emulation already running');
+    return;
+  }
+
+  const { spawn } = require('child_process');
+  emulationProcess = spawn('python', ['anite_connection.py', snr.toString(), channelType]);
+
+  emulationProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    log(`[ANITE] ${output}`);
+    if (win) {
+      win.webContents.send('emulation-output', output);
+    }
+  });
+
+  emulationProcess.stderr.on('data', (data) => {
+    const output = data.toString();
+    log(`[ANITE] ERROR: ${output}`);
+    if (win) {
+      win.webContents.send('emulation-error', output);
+    }
+  });
+
+  emulationProcess.on('close', (code) => {
+    log(`[ANITE] Emulation process exited with code ${code}`);
+    emulationProcess = null;
+  });
+
+  log('[ANITE] Emulation started');
+});
+
+ipcMain.on('stop-emulation', () => {
+  log('[ANITE] Stop emulation requested');
+  
+  if (!emulationProcess) {
+    log('[ANITE] No emulation process running');
+    return;
+  }
+
+  try {
+    emulationProcess.kill();
+    emulationProcess = null;
+    log('[ANITE] Emulation stopped');
+  } catch (e) {
+    log(`[ANITE] Error stopping emulation: ${e.message}`);
+  }
+});
+
+/* ===================== FILENAME SELECTION ===================== */
+
+ipcMain.on('select-filename', (event, { filename }) => {
+  const validFilenames = ['TDL-A', 'TDL-B', 'TDL-C', 'AWGN'];
+  if (!validFilenames.includes(filename)) {
+    log(`[FILENAME] Invalid filename: ${filename}`);
+    return;
+  }
+  
+  selectedFilename = filename;
+  ensureCSVDirectory();
+  log(`[FILENAME] Selected: ${selectedFilename}, CSV path: ${CSV_PATH}`);
+});
+
+/* ===================== SNR SWEEP ===================== */
+
+function stopSweep() {
+  if (sweepTimer) {
+    clearTimeout(sweepTimer);
+    sweepTimer = null;
+  }
+  sweepRunning = false;
+  log('[SWEEP] Sweep stopped');
+}
+
+function executeSweepCycle() {
+  if (!sweepRunning || !sweepEvent || !sweepParams) {
+    log('[SWEEP] Sweep parameters missing or stopped');
+    stopSweep();
+    return;
+  }
+
+  const { channelType, serverSerial, clientSerial, mcs } = sweepParams;
+
+  log(`[SWEEP] === CYCLE ${sweepCurrentSnr}/${sweepMaxSnr}: Starting at SNR=${sweepCurrentSnr} dB ===`);
+
+  // Start Anite emulation at current SNR
+  log(`[SWEEP] Starting Anite emulation with SNR=${sweepCurrentSnr}`);
+  const { spawn } = require('child_process');
+  emulationProcess = spawn('python', ['anite_connection.py', sweepCurrentSnr.toString(), channelType]);
+
+  emulationProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    log(`[SWEEP ANITE] ${output}`);
+    if (win) {
+      win.webContents.send('emulation-output', output);
+    }
+  });
+
+
+  emulationProcess.stderr.on('data', (data) => {
+    const output = data.toString();
+    log(`[SWEEP ANITE] ERROR: ${output}`);
+  });
+
+  // Wait 10 s for Anite to stabilize, then start server/client
+  setTimeout(() => {
+    log(`[SWEEP] Starting server and client at SNR=${sweepCurrentSnr}`);
+    
+    // Start server directly (call the start function instead of sending IPC)
+    if (!serverResetDone) {
+      resetBoard(sweepParams.serverSerial, 'SERVER', () => {
+        startServerAfterReset(sweepEvent, sweepParams.serverSerial, sweepCurrentSnr);
+        serverResetDone = true;
+      });
+    } else {
+      startServerAfterReset(sweepEvent, sweepParams.serverSerial, sweepCurrentSnr);
+    }
+    
+    // Start client after 500ms
+    setTimeout(() => {
+      if (!clientResetDone) {
+        resetBoard(sweepParams.clientSerial, 'CLIENT', () => {
+          clientResetDone = true;
+          startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepParams.mcs);
+        });
+      } else {
+        startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepParams.mcs);
+      }
+    }, 500);
+
+    // Wait 2 minutes (120000ms) for measurement
+    sweepTimer = setTimeout(() => {
+      log(`[SWEEP] 2-minute measurement complete at SNR=${sweepCurrentSnr}, stopping server/client`);
+      stopServerInternal();
+
+      // Stop Anite
+      if (emulationProcess) {
+        try {
+          emulationProcess.kill();
+          emulationProcess = null;
+        } catch (e) {
+          log(`[SWEEP] Error stopping Anite: ${e.message}`);
+        }
+      }
+
+      // Increment SNR
+      sweepCurrentSnr+= 0.5;
+
+      if (sweepCurrentSnr <= sweepMaxSnr) {
+        // Continue sweep with 3 second gap for reset
+        log(`[SWEEP] Waiting 3 seconds before next cycle...`);
+        sweepTimer = setTimeout(() => {
+          executeSweepCycle();
+        }, 3000);
+      } else {
+        log('[SWEEP] === SWEEP COMPLETE ===');
+        stopSweep();
+      }
+    }, 120000); // 2 minutes
+  }, 10000); // 10 seconds
+}
+
+ipcMain.on('start-sweep', (event, { maxSnr, channelType, serverSerial, clientSerial, mcs }) => {
+  log(`[SWEEP] Start sweep requested: 0-${maxSnr} dB, Channel=${channelType}`);
+
+  if (sweepRunning) {
+    log('[SWEEP] Sweep already running');
+    return;
+  }
+
+  sweepEvent = event;
+  sweepParams = { channelType, serverSerial, clientSerial, mcs };
+  sweepCurrentSnr = 0.5;
+  sweepMaxSnr = parseInt(maxSnr, 10);
+  sweepRunning = true;
+
+  executeSweepCycle();
+});
+
+ipcMain.on('stop-sweep', () => {
+  log('[SWEEP] Stop sweep requested');
+  stopSweep();
+  stopServerInternal();
+  
+  if (emulationProcess) {
+    try {
+      emulationProcess.kill();
+      emulationProcess = null;
+    } catch (e) {
+      log(`[SWEEP] Error stopping Anite: ${e.message}`);
+    }
+  }
 });

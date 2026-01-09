@@ -30,6 +30,15 @@ h2 {
     padding-bottom: 5px;
 }
 
+h3 {
+    font-size: 1.2rem;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #34495e;
+    border-bottom: 1px solid #bdc3c7;
+    padding-bottom: 5px;
+}
+
 /* Labels and Inputs */
 label {
     display: inline-block;
@@ -47,7 +56,35 @@ input[type="text"] {
     transition: border-color 0.2s;
 }
 
-input[type="text"]:focus {
+input[type="number"] {
+    width: calc(100% - 12px);
+    padding: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+select {
+    width: calc(100% - 12px);
+    padding: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 1rem;
+    background-color: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+select:focus {
     border-color: #3498db;
     outline: none;
 }
@@ -98,7 +135,30 @@ div.section {
 /* Responsive */
 @media (max-width: 600px) {
     input[type="text"] {
-        width: 100%;
+ 
+
+/* Form sections */
+.form-section {
+    background-color: #ecf0f1;
+    border-left: 4px solid #3498db;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+.form-section h3 {
+    margin-top: 0;
+}
+
+.form-section:last-child {
+    margin-bottom: 0;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}       width: 100%;
     }
 
     button {
@@ -118,4 +178,12 @@ div.section {
     float: right;
     width: 50%;
     padding: 10px;
+}
+
+button.danger {
+    background-color: #e74c3c;
+}
+
+button.danger:hover {
+    background-color: #c0392b;
 }
