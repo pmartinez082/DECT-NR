@@ -769,7 +769,7 @@ ipcMain.on('start-server-client-loop', (event, { serial_server, snr, serial_clie
   // Set up periodic cycle: every 60 seconds, stop and restart
   serverClientLoopTimer = setInterval(() => {
     executeServerClientLoopCycle();
-  }, 60000);
+  }, 120000);
   
   log('[LOOP] Periodic loop started (60-second cycle)');
 });
@@ -847,7 +847,7 @@ function startServerAfterReset(event, serial, snr) {
       return;
     }
 
-    const cmd = `dect perf -s -p ${snrValue}\n`;
+    const cmd = `dect perf -s --pdc_number=${snrValue}\n`;
     log(`[SERVER] TX: ${cmd.trim()}`);
     serverPort.write(cmd, (err) => {
       if (err) {
@@ -900,7 +900,7 @@ function startClientAfterReset(event, serial, mcs) {
 
   // Parse MCS as integer with validation
   const mcsValue = parseInt(mcs, 10);
-  if (isNaN(mcsValue)|| mcsValue < 1 || mcsValue > 4) {
+  if (isNaN(mcsValue)|| mcsValue < 0 || mcsValue > 4) {
     log('[CLIENT] Invalid MCS value: ' + mcs);
     return;
   }
@@ -947,7 +947,7 @@ function startClientAfterReset(event, serial, mcs) {
       return;
     }
 
-    const cmd = `dect perf -c --c_tx_mcs ${mcsValue} --c_tx_pwr -20 -t 10000\n`;
+    const cmd = `dect perf -c --c_tx_mcs ${mcsValue} --c_tx_pwr -20 -t 100\n`;
     log(`[CLIENT] TX: ${cmd.trim()}`);
     clientPort.write(cmd, (err) => {
       if (err) {
@@ -1107,8 +1107,43 @@ function stopSweep() {
     clearTimeout(sweepTimer);
     sweepTimer = null;
   }
+  
+  // Kill emulation process if still running
+  if (emulationProcess) {
+    try {
+      emulationProcess.kill();
+      emulationProcess = null;
+      log('[SWEEP] Emulation process terminated');
+    } catch (e) {
+      log(`[SWEEP] Error killing emulation process: ${e.message}`);
+    }
+  }
+  
   sweepRunning = false;
   log('[SWEEP] Sweep stopped');
+}
+
+function updateAniteSNR(snrValue, channelType) {
+  if (!emulationProcess) {
+    log(`[SWEEP SNR UPDATE] No ANITE process running, cannot update SNR`);
+    return Promise.reject('No ANITE process');
+  }
+
+  // Send SNR update command to running ANITE process
+  // Command format: snr_update:value:channel
+  const updateCommand = `snr_update:${snrValue}:${channelType}\n`;
+  
+  return new Promise((resolve) => {
+    emulationProcess.stdin.write(updateCommand, 'utf-8', (err) => {
+      if (err) {
+        log(`[SWEEP SNR UPDATE] Error sending SNR update: ${err.message}`);
+        resolve();
+      } else {
+        log(`[SWEEP SNR UPDATE] SNR updated to ${snrValue} dB`);
+        resolve();
+      }
+    });
+  });
 }
 
 function executeSweepCycle() {
@@ -1120,29 +1155,49 @@ function executeSweepCycle() {
 
   const { channelType, serverSerial, clientSerial, mcs } = sweepParams;
 
-  log(`[SWEEP] === CYCLE ${sweepCurrentSnr}/${sweepMaxSnr}: Starting at SNR=${sweepCurrentSnr} dB ===`);
+  // First cycle: start ANITE emulation
+  if (sweepCurrentSnr === 0.5 && !emulationProcess) {
+    log(`[SWEEP] === CYCLE 1: Starting ANITE emulation at SNR=0.5 dB ===`);
+    log(`[SWEEP] Starting Anite emulation with SNR=0.5`);
+    const { spawn } = require('child_process');
+    emulationProcess = spawn('python', ['anite_connection.py', '0.5', channelType], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
 
-  // Start Anite emulation at current SNR
-  log(`[SWEEP] Starting Anite emulation with SNR=${sweepCurrentSnr}`);
-  const { spawn } = require('child_process');
-  emulationProcess = spawn('python', ['anite_connection.py', sweepCurrentSnr.toString(), channelType]);
+    emulationProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      log(`[SWEEP ANITE] ${output}`);
+      if (win) {
+        win.webContents.send('emulation-output', output);
+      }
+    });
 
-  emulationProcess.stdout.on('data', (data) => {
-    const output = data.toString();
-    log(`[SWEEP ANITE] ${output}`);
-    if (win) {
-      win.webContents.send('emulation-output', output);
-    }
-  });
+    emulationProcess.stderr.on('data', (data) => {
+      const output = data.toString();
+      log(`[SWEEP ANITE] ERROR: ${output}`);
+    });
 
+    emulationProcess.on('exit', (code, signal) => {
+      log(`[SWEEP ANITE] Process exited with code ${code}, signal ${signal}`);
+      emulationProcess = null;
+    });
 
-  emulationProcess.stderr.on('data', (data) => {
-    const output = data.toString();
-    log(`[SWEEP ANITE] ERROR: ${output}`);
-  });
+    // Wait 10s for ANITE to stabilize before running measurements
+    sweepTimer = setTimeout(() => {
+      runSweepMeasurement();
+    }, 10000);
+  } else if (emulationProcess) {
+    // Subsequent cycles: update SNR and run measurement
+    log(`[SWEEP] === CYCLE ${sweepCurrentSnr}/${sweepMaxSnr}: Updating SNR=${sweepCurrentSnr} dB ===`);
+    updateAniteSNR(sweepCurrentSnr, channelType).then(() => {
+      // Wait 2 seconds for SNR update to take effect, then run measurement
+      sweepTimer = setTimeout(() => {
+        runSweepMeasurement();
+      }, 2000);
+    });
+  }
 
-  // Wait 10 s for Anite to stabilize, then start server/client
-  setTimeout(() => {
+  function runSweepMeasurement() {
     log(`[SWEEP] Starting server and client at SNR=${sweepCurrentSnr}`);
     
     // Start server directly (call the start function instead of sending IPC)
@@ -1172,18 +1227,8 @@ function executeSweepCycle() {
       log(`[SWEEP] 2-minute measurement complete at SNR=${sweepCurrentSnr}, stopping server/client`);
       stopServerInternal();
 
-      // Stop Anite
-      if (emulationProcess) {
-        try {
-          emulationProcess.kill();
-          emulationProcess = null;
-        } catch (e) {
-          log(`[SWEEP] Error stopping Anite: ${e.message}`);
-        }
-      }
-
-      // Increment SNR
-      sweepCurrentSnr+= 0.5;
+      // Increment SNR for next cycle
+      sweepCurrentSnr += 0.5;
 
       if (sweepCurrentSnr <= sweepMaxSnr) {
         // Continue sweep with 3 second gap for reset
@@ -1192,11 +1237,45 @@ function executeSweepCycle() {
           executeSweepCycle();
         }, 3000);
       } else {
-        log('[SWEEP] === SWEEP COMPLETE ===');
-        stopSweep();
+        log('[SWEEP] === SWEEP COMPLETE - Closing ANITE emulation ===');
+        
+        // Close ANITE process after sweep completes
+        if (emulationProcess) {
+          try {
+            log(`[SWEEP] Sending SIGTERM to Anite process for graceful shutdown`);
+            emulationProcess.kill('SIGTERM');
+            
+            // Wait for process to exit gracefully (up to 2 seconds)
+            const exitPromise = new Promise((resolve) => {
+              emulationProcess.once('exit', () => {
+                log(`[SWEEP] Anite process exited`);
+                resolve();
+              });
+              
+              // Force kill after 2 seconds if not exited
+              setTimeout(() => {
+                if (emulationProcess) {
+                  log(`[SWEEP] Force killing Anite process after timeout`);
+                  emulationProcess.kill('SIGKILL');
+                }
+                resolve();
+              }, 2000);
+            });
+            
+            exitPromise.then(() => {
+              emulationProcess = null;
+              stopSweep();
+            });
+          } catch (e) {
+            log(`[SWEEP] Error stopping Anite: ${e.message}`);
+            stopSweep();
+          }
+        } else {
+          stopSweep();
+        }
       }
     }, 120000); // 2 minutes
-  }, 10000); // 10 seconds
+  }
 }
 
 ipcMain.on('start-sweep', (event, { maxSnr, channelType, serverSerial, clientSerial, mcs }) => {

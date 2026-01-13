@@ -3,10 +3,18 @@ import socket
 import sys
 from datetime import datetime
 import io
+import signal
+import threading
 
 # Reconfigure stdout to use UTF-8 encoding with error handling
 if sys.stdout.encoding.lower() != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+# Global socket and control references
+_socket = None
+_running = True
+_command_queue = []
+_command_lock = threading.Lock()
 
 SERVER_IP = "192.168.1.1"
 SERVER_PORT = 3334
@@ -66,6 +74,19 @@ def check_error(sock: socket.socket) -> None:
         raise RuntimeError(err)
     
 
+def close_emulation(sock: socket.socket) -> None:
+    """
+    Properly close the ANITE emulation and check for errors.
+    """
+    try:
+        log("Closing ANITE emulation...")
+        send(sock, "DIAG:SIMU:CLOSE")
+        check_error(sock)
+        log("ANITE emulation closed successfully")
+    except Exception as e:
+        log(f"Error closing emulation: {e}")
+
+
 def set_snr(sock: socket.socket,
                      interferer: int,
                      snr_db: float) -> None:
@@ -81,7 +102,41 @@ def set_snr(sock: socket.socket,
 
    
 
+def signal_handler(signum, frame):
+    """Handle termination signals to properly close ANITE emulation."""
+    global _running
+    log(f"Signal {signum} received, closing emulation...")
+    _running = False
+    if _socket:
+        try:
+            close_emulation(_socket)
+        except Exception as e:
+            log(f"Error in signal handler: {e}")
+    sys.exit(0)
+
+
+def stdin_reader_thread():
+    """Thread that continuously reads commands from stdin (works on Windows)."""
+    global _command_queue, _running
+    try:
+        while _running:
+            try:
+                line = sys.stdin.readline().strip()
+                if line:
+                    with _command_lock:
+                        _command_queue.append(line)
+                else:
+                    # EOF reached
+                    break
+            except Exception as e:
+                log(f"Error reading stdin: {e}")
+                break
+    except Exception as e:
+        log(f"Stdin reader thread error: {e}")
+
+
 def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
+    global _socket, _running, _command_queue
     sock = None
     try:
         # Construct emulation path based on type
@@ -90,6 +145,11 @@ def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
         log(f"Using emulation file: {emulation_path}")
         
         sock = connect()
+        _socket = sock  # Store globally for signal handler
+        
+        # Register signal handlers for clean shutdown
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
         # Open emulation
         send(sock, f"CALCulate:FILTer:FILE {emulation_path}")
@@ -109,30 +169,65 @@ def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
             check_error(sock)
             log(f"SNR set to {snr_db} dB")
 
-        # Keep running until interrupted
-        log("Emulation will run until stopped externally")
+        # Start stdin reader thread (works on Windows)
+        _running = True
+        stdin_thread = threading.Thread(target=stdin_reader_thread, daemon=True)
+        stdin_thread.start()
+        
+        log("Emulation running. Listening for SNR update commands...")
         import time
+        
         try:
-            while True:
-                time.sleep(1)
+            while _running:
+                # Check for pending commands
+                with _command_lock:
+                    if _command_queue:
+                        command = _command_queue.pop(0)
+                    else:
+                        command = None
+                
+                if command:
+                    log(f"Received command: {command}")
+                    
+                    # Parse SNR update command: snr_update:value:channel
+                    if command.startswith('snr_update:'):
+                        parts = command.split(':')
+                        if len(parts) >= 3:
+                            try:
+                                new_snr = float(parts[1])
+                                log(f"Updating SNR to {new_snr} dB")
+                                set_snr(sock, interferer=1, snr_db=new_snr)
+                                check_error(sock)
+                                log(f"SNR updated to {new_snr} dB")
+                            except (ValueError, RuntimeError) as e:
+                                log(f"Error updating SNR: {e}")
+                    
+                    elif command == 'stop':
+                        log("Stop command received")
+                        _running = False
+                        break
+                
+                time.sleep(0.1)  # Short sleep to avoid busy-waiting
+                
         except KeyboardInterrupt:
             log("Keyboard interrupt received")
+            _running = False
        
         return 0
 
     except Exception as e:
         log(f"ERROR: {e}")
         return 1
-    
     finally:
-        # Always close the socket, even if an error occurred
+        _running = False
         if sock:
             try:
-                log("Closing socket connection")
+                close_emulation(sock)
                 sock.close()
-                log("Connection closed")
             except Exception as e:
-                log(f"Error closing socket: {e}")
+                log(f"Error closing connection: {e}")
+        
+        _socket = None
 
 
 if __name__ == "__main__":

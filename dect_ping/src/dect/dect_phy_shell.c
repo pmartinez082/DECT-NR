@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
+#include <ctype.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/shell/shell.h>
@@ -219,6 +220,7 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
 	params.debugs = false;
 	params.use_harq = false;
+	params.pdc_number = 0;
 	params.mdm_init_harq_process_count = current_settings->harq.mdm_init_harq_process_count;
 	params.mdm_init_harq_expiry_time_us = current_settings->harq.mdm_init_harq_expiry_time_us;
 	params.client_harq_feedback_rx_subslot_count =
@@ -230,7 +232,7 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 		current_settings->harq.harq_feedback_tx_delay_subslot_count;
 	params.server_harq_feedback_tx_rx_delay_subslot_count = 4;
 
-	while ((opt = getopt_long(argc, argv, "e:t:csadh p:", long_options_perf, &long_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+e:t:csadhp:", long_options_perf, &long_index)) != -1) {
 		switch (opt) {
 		case 'd': {
 			params.debugs = true;
