@@ -187,3 +187,37 @@ button.danger {
 button.danger:hover {
     background-color: #c0392b;
 }
+
+/* SNR Range Configuration */
+#snr-ranges-container {
+    background-color: #ecf0f1;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+}
+
+.snr-range-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px;
+    background-color: white;
+    border-radius: 3px;
+}
+
+.snr-range-row label {
+    min-width: 70px;
+    margin-bottom: 0;
+}
+
+.snr-range-row input {
+    width: 80px;
+    padding: 6px;
+    margin-bottom: 0;
+}
+
+.snr-range-row span {
+    color: #7f8c8d;
+    font-weight: normal;
+}

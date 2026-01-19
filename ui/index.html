@@ -17,12 +17,75 @@
   <h2>General Settings</h2>
     <label for="pdf-select">Channel Type:</label>
       <select id="pdf-select">
+        <option value="AWGN">AWGN</option>
         <option value="TDL-A">TDL-A</option>
         <option value="TDL-B">TDL-B</option>
         <option value="TDL-C">TDL-C</option>
-        <option value="AWGN">AWGN</option>
+        
       </select>
-<label for="mcs-input">MCS</label>
+
+</div>
+   <div class="right">
+    <h2>Anite configuration</h2>
+        <div class="form-section">
+      <h3>SNR-MCS Sweep</h3>
+      <p style="font-size: 0.9em; color: #666;">Configure SNR range for each MCS (0-4):</p>
+      
+      <div id="snr-ranges-container">
+        <!-- MCS 0 -->
+        <div class="snr-range-row">
+          <label>MCS 0:</label>
+          <input type="number" class="snr-min" data-mcs="0" placeholder="Min" min="0" max="50" step="0.5" value="0.5">
+          <span>to</span>
+          <input type="number" class="snr-max" data-mcs="0" placeholder="Max" min="0" max="50" step="0.5" value="7">
+          <span>dB</span>
+        </div>
+        
+        <!-- MCS 1 -->
+        <div class="snr-range-row">
+          <label>MCS 1:</label>
+          <input type="number" class="snr-min" data-mcs="1" placeholder="Min" min="0" max="50" step="0.5" value="0.5">
+          <span>to</span>
+          <input type="number" class="snr-max" data-mcs="1" placeholder="Max" min="0" max="50" step="0.5" value="7">
+          <span>dB</span>
+        </div>
+        
+        <!-- MCS 2 -->
+        <div class="snr-range-row">
+          <label>MCS 2:</label>
+          <input type="number" class="snr-min" data-mcs="2" placeholder="Min" min="0" max="50" step="0.5" value="4">
+          <span>to</span>
+          <input type="number" class="snr-max" data-mcs="2" placeholder="Max" min="0" max="50" step="0.5" value="8">
+          <span>dB</span>
+        </div>
+        
+        <!-- MCS 3 -->
+        <div class="snr-range-row">
+          <label>MCS 3:</label>
+          <input type="number" class="snr-min" data-mcs="3" placeholder="Min" min="0" max="50" step="0.5" value="6">
+          <span>to</span>
+          <input type="number" class="snr-max" data-mcs="3" placeholder="Max" min="0" max="50" step="0.5" value="12">
+          <span>dB</span>
+        </div>
+        
+        <!-- MCS 4 -->
+        <div class="snr-range-row">
+          <label>MCS 4:</label>
+          <input type="number" class="snr-min" data-mcs="4" placeholder="Min" min="0" max="50" step="0.5" value="8">
+          <span>to</span>
+          <input type="number" class="snr-max" data-mcs="4" placeholder="Max" min="0" max="50" step="0.5" value="16">
+          <span>dB</span>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button id="start-sweep">Start Sweep</button>
+        <button id="stop-sweep" class="danger">Stop Sweep</button>
+      </div>
+    </div>
+    <div class="form-section">
+      <h3>Single Emulation</h3>
+      <label for="mcs-input">MCS</label>
       <input
         type="number"
         id="mcs-input"
@@ -32,34 +95,11 @@
         step="1"
         value="1"
       >
-</div>
-   <div class="right">
-    <h2>Anite configuration</h2>
-    
-    <div class="form-section">
-      <h3>Single Emulation</h3>
       <button id="start-emulation">Start Emulation</button>
       <button id="stop-emulation" class="danger">Stop Emulation</button>
     </div>
 
-    <div class="form-section">
-      <h3>SNR Sweep</h3>
-      <label for="max-snr-input">Max SNR (dB):</label>
-      <input
-        type="number"
-        id="max-snr-input"
-        placeholder="Enter max SNR"
-        min="0"
-        max="50"
-        step="1"
-        value="10"
-      >
 
-      <div class="button-row">
-        <button id="start-sweep">Start Sweep</button>
-        <button id="stop-sweep" class="danger">Stop Sweep</button>
-      </div>
-    </div>
   </div>
   <div class="container">
 

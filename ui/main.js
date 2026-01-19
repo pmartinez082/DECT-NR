@@ -38,6 +38,8 @@ let sweepEvent = null;
 let sweepParams = null;
 let sweepCurrentSnr = 0;
 let sweepMaxSnr = 0;
+let sweepCurrentMcs = 1;
+let sweepMaxMcs = 4;
 let sweepRunning = false;
 
 // Regex to find pdc records: pdc,number,number,number (also pdc_err, pcc, pcc_err variants)
@@ -78,6 +80,7 @@ function log(msg) {
 function ensureCSVDirectory() {
   try {
     CSV_PATH = getCSVPath();
+    log(`[CSV] CSV_PATH updated to: ${CSV_PATH}`);
     fs.mkdirSync(path.dirname(CSV_PATH), { recursive: true });
   } catch (err) {
     log(`[CSV] Failed to create directory: ${err.message}`);
@@ -86,23 +89,17 @@ function ensureCSVDirectory() {
 
 // Append an array of pdc records to CSV and send to UI/log
 function handlePdcRecords(records, event) {
-  ensureCSVDirectory();
-  records.forEach(r => {
-    // Debug: log the raw string
-    log(`[CSV] Raw input: "${r}" (length: ${r.length})`);
-    
-    // Normalize for CSV: remove extra whitespace but keep comma separation
-    const normalized = r.replace(/\s+/g, ',').toLowerCase();
-    
-    // Debug: log the normalized result
-    log(`[CSV] Normalized: "${normalized}"`);
-    
-    // Append to CSV with newline
-    try {
-      fs.appendFileSync(CSV_PATH, normalized + '\n');
-      log(`[CSV] Wrote: ${normalized}`);
-    } catch (err) {
-      log('[SERVER] Failed to append to CSV: ' + err.message);
+  if (!records || records.length === 0) return;
+  
+  // Batch all records into a single write to minimize I/O
+  const csv_lines = records
+    .map(r => r.replace(/\s+/g, ',').toLowerCase())
+    .join('\n') + '\n';
+  
+  // Use async write to avoid blocking event loop
+  fs.appendFile(CSV_PATH, csv_lines, (err) => {
+    if (err) {
+      log('[CSV] Failed to append: ' + err.message);
     }
   });
 }
@@ -351,7 +348,8 @@ function openSerial(portPath, tag, onData) {
   const port = new SerialPort({
     path: portPath,
     baudRate: 115200,
-    autoOpen: false
+    autoOpen: false,
+    highWaterMark: 256 * 1024  // 256KB buffer to handle high data rates
   });
 
   port.open(err => {
@@ -430,19 +428,22 @@ function stopClientInternal() {
   clientBuffer = '';
   clientLastPdcAt = 0;
 
-  // Immediately mark port as closing to prevent other operations
-  clientPortOpen = false;
+  // Save port reference and null it out to prevent other operations
+  // Don't set clientPortOpen = false yet, let the close event handle that
+  const port = clientPort;
+  clientPort = null;
 
   // Pause briefly to let rapid output settle before sending stop command
   setTimeout(() => {
-    if (!clientPort) {
-      log('[CLIENT] Port closed before stop command could be sent');
+    if (!port) {
+      log('[CLIENT] Port was closed before stop command');
+      clientPortOpen = false;
       return;
     }
 
     // Send stop command with explicit callback to verify write
     const cmd = 'dect perf stop\n';
-    clientPort.write(cmd, (err) => {
+    port.write(cmd, (err) => {
       if (err) {
         log('[CLIENT] Stop command write failed: ' + err.message);
       } else {
@@ -452,13 +453,13 @@ function stopClientInternal() {
 
     // Wait a bit for the device to process the command and start emitting stop response
     setTimeout(() => {
-      executeClientStopWaitAndReset();
+      executeClientStopWaitAndReset(port);
     }, 300);
   }, 150);
 }
 
-function executeClientStopWaitAndReset() {
-  // Wait up to 5000ms for "perf command stopping" ack (and a short quiet period) before DTR reset
+function executeClientStopWaitAndReset(port) {
+  // Wait up to 5000ms for "perf command stopping" ack (and a short quiet period) before closing port
   const waitClientAck = new Promise((resolve) => {
     clientStopAckResolve = resolve; // resolve will be called by checkForStopAck -> scheduleStopAckResolution
     const timeout = setTimeout(() => {
@@ -468,13 +469,20 @@ function executeClientStopWaitAndReset() {
   });
 
   waitClientAck.then((ok) => {
-    if (!ok) log('[CLIENT] Stop ack not detected within timeout; proceeding with reset');
-    else log('[CLIENT] Stop ack detected and quiet period observed; proceeding with reset');
+    if (!ok) log('[CLIENT] Stop ack not detected within timeout; closing port');
+    else log('[CLIENT] Stop ack detected and quiet period observed; closing port');
 
-    // Add extra delay before DTR to ensure device has finished emitting
-    setTimeout(() => {
-      performClientDtrReset();
-    }, 200);
+    // Close the port (which will trigger the close event to set clientPortOpen = false)
+    if (port) {
+      port.close((err) => {
+        if (err) {
+          log(`[CLIENT] Error closing port: ${err.message}`);
+          clientPortOpen = false;
+        }
+      });
+    } else {
+      clientPortOpen = false;
+    }
   });
 }
 
@@ -568,22 +576,25 @@ function stopServerInternal() {
     serverTimer = null;
   }
 
-  // Immediately mark port as closing to prevent other operations
-  serverPortOpen = false;
+  // Save port reference and null it out to prevent other operations
+  // Don't set serverPortOpen = false yet, let the close event handle that
+  const port = serverPort;
+  serverPort = null;
 
   // Stop client first
   stopClientInternal();
 
   // Pause briefly to let rapid output settle before sending stop command
   setTimeout(() => {
-    if (!serverPort) {
-      log('[SERVER] Port closed before stop command could be sent');
+    if (!port) {
+      log('[SERVER] Port was closed before stop command');
+      serverPortOpen = false;
       return;
     }
 
     // Send stop command with explicit callback to verify write
     const cmd = 'dect perf stop\n';
-    serverPort.write(cmd, (err) => {
+    port.write(cmd, (err) => {
       if (err) {
         log('[SERVER] Stop command write failed: ' + err.message);
       } else {
@@ -593,13 +604,13 @@ function stopServerInternal() {
 
     // Wait a bit for the device to process the command and start emitting stop response
     setTimeout(() => {
-      executeServerStopWaitAndReset();
+      executeServerStopWaitAndReset(port);
     }, 300);
   }, 150);
 }
 
-function executeServerStopWaitAndReset() {
-  // Wait up to 5000ms for "perf command stopping" ack (and quiet period) before DTR reset
+function executeServerStopWaitAndReset(port) {
+  // Wait up to 5000ms for "perf command stopping" ack (and quiet period) before closing port
   const waitServerAck = new Promise((resolve) => {
     serverStopAckResolve = resolve; // resolve will be called by checkForStopAck -> scheduleStopAckResolution
     const timeout = setTimeout(() => {
@@ -609,13 +620,20 @@ function executeServerStopWaitAndReset() {
   });
 
   waitServerAck.then((ok) => {
-    if (!ok) log('[SERVER] Stop ack not detected within timeout; proceeding with reset');
-    else log('[SERVER] Stop ack detected and quiet period observed; proceeding with reset');
+    if (!ok) log('[SERVER] Stop ack not detected within timeout; closing port');
+    else log('[SERVER] Stop ack detected and quiet period observed; closing port');
 
-    // Add extra delay before DTR to ensure device has finished emitting
-    setTimeout(() => {
-      performServerDtrReset();
-    }, 200);
+    // Close the port (which will trigger the close event to set serverPortOpen = false)
+    if (port) {
+      port.close((err) => {
+        if (err) {
+          log(`[SERVER] Error closing port: ${err.message}`);
+          serverPortOpen = false;
+        }
+      });
+    } else {
+      serverPortOpen = false;
+    }
   });
 }
 
@@ -1096,6 +1114,7 @@ ipcMain.on('select-filename', (event, { filename }) => {
   }
   
   selectedFilename = filename;
+  CSV_PATH = getCSVPath();
   ensureCSVDirectory();
   log(`[FILENAME] Selected: ${selectedFilename}, CSV path: ${CSV_PATH}`);
 });
@@ -1119,8 +1138,15 @@ function stopSweep() {
     }
   }
   
+  // Reset all sweep state
   sweepRunning = false;
-  log('[SWEEP] Sweep stopped');
+  sweepCurrentSnr = 0;
+  sweepMaxSnr = 0;
+  sweepCurrentMcs = 0;
+  sweepMaxMcs = 4;
+  sweepEvent = null;
+  sweepParams = null;
+  log('[SWEEP] Sweep stopped and state reset');
 }
 
 function updateAniteSNR(snrValue, channelType) {
@@ -1153,14 +1179,15 @@ function executeSweepCycle() {
     return;
   }
 
-  const { channelType, serverSerial, clientSerial, mcs } = sweepParams;
+  const { channelType, serverSerial, clientSerial, snrRanges } = sweepParams;
+  const currentRange = snrRanges[sweepCurrentMcs];
 
   // First cycle: start ANITE emulation
-  if (sweepCurrentSnr === 0.5 && !emulationProcess) {
-    log(`[SWEEP] === CYCLE 1: Starting ANITE emulation at SNR=0.5 dB ===`);
-    log(`[SWEEP] Starting Anite emulation with SNR=0.5`);
+  if (sweepCurrentSnr === currentRange.min && sweepCurrentMcs === 0 && !emulationProcess) {
+    log(`[SWEEP] === CYCLE 1: Starting ANITE emulation at SNR=${currentRange.min} dB, MCS=0 ===`);
+    log(`[SWEEP] Starting Anite emulation with SNR=${currentRange.min}`);
     const { spawn } = require('child_process');
-    emulationProcess = spawn('python', ['anite_connection.py', '0.5', channelType], {
+    emulationProcess = spawn('python', ['anite_connection.py', currentRange.min.toString(), channelType], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
 
@@ -1188,7 +1215,7 @@ function executeSweepCycle() {
     }, 10000);
   } else if (emulationProcess) {
     // Subsequent cycles: update SNR and run measurement
-    log(`[SWEEP] === CYCLE ${sweepCurrentSnr}/${sweepMaxSnr}: Updating SNR=${sweepCurrentSnr} dB ===`);
+    log(`[SWEEP] === CYCLE MCS=${sweepCurrentMcs}, SNR=${sweepCurrentSnr}/${currentRange.max} dB ===`);
     updateAniteSNR(sweepCurrentSnr, channelType).then(() => {
       // Wait 2 seconds for SNR update to take effect, then run measurement
       sweepTimer = setTimeout(() => {
@@ -1198,7 +1225,7 @@ function executeSweepCycle() {
   }
 
   function runSweepMeasurement() {
-    log(`[SWEEP] Starting server and client at SNR=${sweepCurrentSnr}`);
+    log(`[SWEEP] Starting server and client at SNR=${sweepCurrentSnr}, MCS=${sweepCurrentMcs}`);
     
     // Start server directly (call the start function instead of sending IPC)
     if (!serverResetDone) {
@@ -1210,86 +1237,125 @@ function executeSweepCycle() {
       startServerAfterReset(sweepEvent, sweepParams.serverSerial, sweepCurrentSnr);
     }
     
-    // Start client after 500ms
+    // Start client after 500ms with current MCS
     setTimeout(() => {
       if (!clientResetDone) {
         resetBoard(sweepParams.clientSerial, 'CLIENT', () => {
           clientResetDone = true;
-          startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepParams.mcs);
+          startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepCurrentMcs);
         });
       } else {
-        startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepParams.mcs);
+        startClientAfterReset(sweepEvent, sweepParams.clientSerial, sweepCurrentMcs);
       }
     }, 500);
 
-    // Wait 2 minutes (120000ms) for measurement
+    // Wait for measurement
     sweepTimer = setTimeout(() => {
-      log(`[SWEEP] 2-minute measurement complete at SNR=${sweepCurrentSnr}, stopping server/client`);
+      log(`[SWEEP] 2-minute measurement complete at SNR=${sweepCurrentSnr}, MCS=${sweepCurrentMcs}, stopping server/client`);
       stopServerInternal();
 
       // Increment SNR for next cycle
-      sweepCurrentSnr += 0.5;
+      sweepCurrentSnr += 1;
 
-      if (sweepCurrentSnr <= sweepMaxSnr) {
-        // Continue sweep with 3 second gap for reset
-        log(`[SWEEP] Waiting 3 seconds before next cycle...`);
+      if (sweepCurrentSnr <= currentRange.max) {
+        // Continue SNR sweep with longer gap (10 seconds) for proper cleanup
+        log(`[SWEEP] Waiting 10 seconds before next SNR cycle...`);
         sweepTimer = setTimeout(() => {
+          // Clear buffers before next cycle
+          serverBuffer = '';
+          clientBuffer = '';
+          serverLastPdcAt = 0;
+          clientLastPdcAt = 0;
           executeSweepCycle();
-        }, 3000);
+        }, 10000);
       } else {
-        log('[SWEEP] === SWEEP COMPLETE - Closing ANITE emulation ===');
-        
-        // Close ANITE process after sweep completes
-        if (emulationProcess) {
-          try {
-            log(`[SWEEP] Sending SIGTERM to Anite process for graceful shutdown`);
-            emulationProcess.kill('SIGTERM');
-            
-            // Wait for process to exit gracefully (up to 2 seconds)
-            const exitPromise = new Promise((resolve) => {
-              emulationProcess.once('exit', () => {
-                log(`[SWEEP] Anite process exited`);
-                resolve();
+        // SNR sweep complete for current MCS, check if we need to move to next MCS
+        if (sweepCurrentMcs < sweepMaxMcs) {
+          sweepCurrentMcs += 1;
+          sweepCurrentSnr = snrRanges[sweepCurrentMcs].min; // Reset SNR to new MCS min
+          log(`[SWEEP] === COMPLETED MCS=${sweepCurrentMcs - 1}, Moving to MCS=${sweepCurrentMcs} (SNR ${snrRanges[sweepCurrentMcs].min}-${snrRanges[sweepCurrentMcs].max} dB) ===`);
+          log(`[SWEEP] Waiting 10 seconds before starting next MCS sweep...`);
+          sweepTimer = setTimeout(() => {
+            // Clear buffers before next cycle
+            serverBuffer = '';
+            clientBuffer = '';
+            serverLastPdcAt = 0;
+            clientLastPdcAt = 0;
+            executeSweepCycle();
+          }, 10000);
+        } else {
+          log('[SWEEP] === SWEEP COMPLETE - All MCS (0-4) completed - Closing ANITE emulation ===');
+          
+          // Close ANITE process after sweep completes
+          if (emulationProcess) {
+            try {
+              log(`[SWEEP] Sending SIGTERM to Anite process for graceful shutdown`);
+              emulationProcess.kill('SIGTERM');
+              
+              // Wait for process to exit gracefully (up to 2 seconds)
+              const exitPromise = new Promise((resolve) => {
+                emulationProcess.once('exit', () => {
+                  log(`[SWEEP] Anite process exited`);
+                  resolve();
+                });
+                
+                // Force kill after 2 seconds if not exited
+                setTimeout(() => {
+                  if (emulationProcess) {
+                    log(`[SWEEP] Force killing Anite process after timeout`);
+                    emulationProcess.kill('SIGKILL');
+                  }
+                  resolve();
+                }, 2000);
               });
               
-              // Force kill after 2 seconds if not exited
-              setTimeout(() => {
-                if (emulationProcess) {
-                  log(`[SWEEP] Force killing Anite process after timeout`);
-                  emulationProcess.kill('SIGKILL');
-                }
-                resolve();
-              }, 2000);
-            });
-            
-            exitPromise.then(() => {
-              emulationProcess = null;
+              exitPromise.then(() => {
+                emulationProcess = null;
+                stopSweep();
+              });
+            } catch (e) {
+              log(`[SWEEP] Error stopping Anite: ${e.message}`);
               stopSweep();
-            });
-          } catch (e) {
-            log(`[SWEEP] Error stopping Anite: ${e.message}`);
+            }
+          } else {
             stopSweep();
           }
-        } else {
-          stopSweep();
         }
       }
-    }, 120000); // 2 minutes
+    }, 120000); // 
   }
 }
 
-ipcMain.on('start-sweep', (event, { maxSnr, channelType, serverSerial, clientSerial, mcs }) => {
-  log(`[SWEEP] Start sweep requested: 0-${maxSnr} dB, Channel=${channelType}`);
+ipcMain.on('start-sweep', (event, { snrRanges, channelType, serverSerial, clientSerial }) => {
+  log(`[SWEEP] Start sweep requested: Channel=${channelType}, MCS 0-4 with custom SNR ranges`);
 
   if (sweepRunning) {
     log('[SWEEP] Sweep already running');
     return;
   }
 
+  // Validate and normalize snrRanges - should have entries for MCS 0-4
+  const normalizedRanges = {};
+  for (let mcs = 0; mcs <= 4; mcs++) {
+    const range = snrRanges && snrRanges[mcs];
+    if (range && range.min !== undefined && range.max !== undefined) {
+      normalizedRanges[mcs] = {
+        min: parseFloat(range.min),
+        max: parseFloat(range.max)
+      };
+      log(`[SWEEP] MCS=${mcs}: SNR ${normalizedRanges[mcs].min} to ${normalizedRanges[mcs].max} dB`);
+    } else {
+      log(`[SWEEP] Warning: No SNR range provided for MCS=${mcs}, using defaults 0.5-10 dB`);
+      normalizedRanges[mcs] = { min: 0.5, max: 10 };
+    }
+  }
+
   sweepEvent = event;
-  sweepParams = { channelType, serverSerial, clientSerial, mcs };
-  sweepCurrentSnr = 0.5;
-  sweepMaxSnr = parseInt(maxSnr, 10);
+  sweepParams = { channelType, serverSerial, clientSerial, snrRanges: normalizedRanges };
+  sweepCurrentSnr = normalizedRanges[0].min;
+  sweepMaxSnr = normalizedRanges[0].max;
+  sweepCurrentMcs = 0;
+  sweepMaxMcs = 4;
   sweepRunning = true;
 
   executeSweepCycle();

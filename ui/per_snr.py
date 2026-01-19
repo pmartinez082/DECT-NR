@@ -1,12 +1,13 @@
+from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import csv
 
-file_name = "anite_TDLB"
+file_name = "AWGN"
 
 # === Load CSV ===
-df = pd.read_csv('./measurements/' + file_name + '.csv')
+df = pd.read_csv('./measurements_2026-01-16/' + file_name + '.csv')
 
 '''
 Current measurement settings:
@@ -19,7 +20,7 @@ Current measurement settings:
 
 # === Clean data ===
 df.columns = df.columns.str.lower()
-
+'''
 # === Sort by sequence number ===
 df = df.sort_values('seq_number').reset_index(drop=True)
 
@@ -34,17 +35,18 @@ if not seq.empty:
     missing_seq_count = len(set(expected_seq) - set(seq))
 
 print("Missing sequence numbers:", missing_seq_count)
-
+'''
 # === Apply filters ===
-df = df[df['snr'] >= 0]
-df = df[df['mcs'] == 1]
+df = df[df['mcs'] >= 0]
+df = df[df['mcs'] <= 4]
 
 # Save cleaned CSV
 df.to_csv('output/cleaned/' + file_name + '_clean.csv', index=False)
 
 # === Assign packet error based on channel ===
 # PDC → 0 (success), PDC_ERR → 1 (error)
-df['packet_error'] = df['channel'].apply(
+# Column 0 is the channel type (pdc, pdc_err), not 'channel'
+df['packet_error'] = df.iloc[:, 0].apply(
     lambda x: 0 if str(x).upper() == 'PDC'
     else 1 if str(x).upper() == 'PDC_ERR'
     else np.nan
@@ -52,7 +54,7 @@ df['packet_error'] = df['channel'].apply(
 
 # Drop rows with unexpected channel names
 df = df.dropna(subset=['packet_error'])
-
+'''
 # === Add virtual packet errors for missing sequence numbers ===
 if missing_seq_count > 0:
     virtual_errors = pd.DataFrame({
@@ -65,13 +67,22 @@ if missing_seq_count > 0:
 
 print("Dropped rows:", original_shape - df.shape[0])
 
+'''
 # === Compute PER per SNR per MCS ===
+
 per_data = (
     df.groupby(['snr', 'mcs'])['packet_error']
     .mean()
     .reset_index()
     .rename(columns={'packet_error': 'per'})
 )
+
+print("DEBUG: DataFrame shape:", df.shape)
+print("DEBUG: DataFrame columns:", df.columns.tolist())
+print("DEBUG: DataFrame head:\n", df.head())
+print("DEBUG: per_data:\n", per_data)
+print("DEBUG: Unique MCS values:", per_data['mcs'].unique())
+
 
 # === Plot ===
 plt.figure(figsize=(8, 6))
@@ -98,7 +109,7 @@ for mcs in sorted(per_data['mcs'].unique()):
 
 plt.xlabel('Signal-to-Noise Ratio (dB)')
 plt.ylabel('Packet Error Rate')
-plt.title(file_name.split('_')[1] + ' channel')
+plt.title(file_name + ' channel')
 plt.grid(True, which='both', linestyle='--', linewidth=0.5)
 plt.yscale('log')
 
@@ -107,7 +118,7 @@ if handles:
     plt.legend(title='MCS')
 
 plt.tight_layout()
-plt.savefig('output/graphs/' + file_name + '.pdf', format='pdf')
+plt.savefig('output/graphs/' + file_name + datetime.now().strftime('%Y-%m-%d') + '.pdf', format='pdf')
 
 # === Export statistics CSV ===
 csv_data = [['SNR(dB)', 'MCS', 'Current Samples']]

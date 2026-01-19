@@ -53,12 +53,23 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('start-sweep').addEventListener('click', () => {
-    const maxSnr = document.getElementById('max-snr-input').value;
     const channelType = document.getElementById('pdf-select').value;
     const serverSerial = document.getElementById('server-serial').value;
     const clientSerial = document.getElementById('client-serial').value;
-    const mcs = document.getElementById('mcs-input').value;
-    ipcRenderer.send('start-sweep', { maxSnr, channelType, serverSerial, clientSerial, mcs });
+    
+    // Collect SNR ranges for each MCS
+    const snrRanges = {};
+    for (let mcs = 0; mcs <= 4; mcs++) {
+      const minInput = document.querySelector(`.snr-min[data-mcs="${mcs}"]`);
+      const maxInput = document.querySelector(`.snr-max[data-mcs="${mcs}"]`);
+      
+      snrRanges[mcs] = {
+        min: parseFloat(minInput.value),
+        max: parseFloat(maxInput.value)
+      };
+    }
+    
+    ipcRenderer.send('start-sweep', { snrRanges, channelType, serverSerial, clientSerial });
   });
 
   document.getElementById('stop-sweep').addEventListener('click', () => {
