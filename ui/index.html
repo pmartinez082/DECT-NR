@@ -31,47 +31,55 @@
       <h3>SNR-MCS Sweep</h3>
       <p style="font-size: 0.9em; color: #666;">Configure SNR range for each MCS (0-4):</p>
       
+      <label for="snr-step">SNR Step (dB):</label>
+      <input type="number" id="snr-step" min="0.1" max="5" step="0.1" value="1">
+      
       <div id="snr-ranges-container">
         <!-- MCS 0 -->
         <div class="snr-range-row">
+          <input type="checkbox" class="mcs-enable" data-mcs="0" checked>
           <label>MCS 0:</label>
-          <input type="number" class="snr-min" data-mcs="0" placeholder="Min" min="0" max="50" step="0.5" value="0.5">
+          <input type="number" class="snr-min" data-mcs="0" placeholder="Min" min="0" max="50" step="0.5" value="-4">
           <span>to</span>
-          <input type="number" class="snr-max" data-mcs="0" placeholder="Max" min="0" max="50" step="0.5" value="7">
+          <input type="number" class="snr-max" data-mcs="0" placeholder="Max" min="0" max="50" step="0.5" value="0">
           <span>dB</span>
         </div>
         
         <!-- MCS 1 -->
         <div class="snr-range-row">
+          <input type="checkbox" class="mcs-enable" data-mcs="1" checked>
           <label>MCS 1:</label>
-          <input type="number" class="snr-min" data-mcs="1" placeholder="Min" min="0" max="50" step="0.5" value="0.5">
+          <input type="number" class="snr-min" data-mcs="1" placeholder="Min" min="0" max="50" step="0.5" value="0">
           <span>to</span>
-          <input type="number" class="snr-max" data-mcs="1" placeholder="Max" min="0" max="50" step="0.5" value="7">
+          <input type="number" class="snr-max" data-mcs="1" placeholder="Max" min="0" max="50" step="0.5" value="5">
           <span>dB</span>
         </div>
         
         <!-- MCS 2 -->
         <div class="snr-range-row">
+          <input type="checkbox" class="mcs-enable" data-mcs="2" checked>
           <label>MCS 2:</label>
-          <input type="number" class="snr-min" data-mcs="2" placeholder="Min" min="0" max="50" step="0.5" value="4">
+          <input type="number" class="snr-min" data-mcs="2" placeholder="Min" min="0" max="50" step="0.5" value="1">
           <span>to</span>
-          <input type="number" class="snr-max" data-mcs="2" placeholder="Max" min="0" max="50" step="0.5" value="8">
+          <input type="number" class="snr-max" data-mcs="2" placeholder="Max" min="0" max="50" step="0.5" value="6">
           <span>dB</span>
         </div>
         
         <!-- MCS 3 -->
         <div class="snr-range-row">
+          <input type="checkbox" class="mcs-enable" data-mcs="3" checked>
           <label>MCS 3:</label>
-          <input type="number" class="snr-min" data-mcs="3" placeholder="Min" min="0" max="50" step="0.5" value="6">
+          <input type="number" class="snr-min" data-mcs="3" placeholder="Min" min="0" max="50" step="0.5" value="4">
           <span>to</span>
-          <input type="number" class="snr-max" data-mcs="3" placeholder="Max" min="0" max="50" step="0.5" value="12">
+          <input type="number" class="snr-max" data-mcs="3" placeholder="Max" min="0" max="50" step="0.5" value="9">
           <span>dB</span>
         </div>
         
         <!-- MCS 4 -->
         <div class="snr-range-row">
+          <input type="checkbox" class="mcs-enable" data-mcs="4" checked>
           <label>MCS 4:</label>
-          <input type="number" class="snr-min" data-mcs="4" placeholder="Min" min="0" max="50" step="0.5" value="8">
+          <input type="number" class="snr-min" data-mcs="4" placeholder="Min" min="0" max="50" step="0.5" value="7">
           <span>to</span>
           <input type="number" class="snr-max" data-mcs="4" placeholder="Max" min="0" max="50" step="0.5" value="16">
           <span>dB</span>
@@ -83,7 +91,7 @@
         <button id="stop-sweep" class="danger">Stop Sweep</button>
       </div>
     </div>
-    <div class="form-section">
+    <!--div class="form-section">
       <h3>Single Emulation</h3>
       <label for="mcs-input">MCS</label>
       <input
@@ -100,7 +108,7 @@
     </div>
 
 
-  </div>
+  </div-->
   <div class="container">
 
     <!-- ================= SERVER ================= -->
@@ -115,7 +123,7 @@
         value="COM6"
       >
 
-      <label for="snr-input">SNR (dB):</label>
+      <!--label for="snr-input">SNR (dB):</!--label>
       <input
         type="number"
         id="snr-input"
@@ -124,12 +132,12 @@
         max="50"
         step="1"
         value="0"
-      >
+    -->
 
-      <div class="button-row">
+      <!--div class="button-row">
         <button id="start-server">Start Server</button>
         <button id="stop-server" class="danger">Stop Server</button>
-      </div>
+      </div-->
 
       <pre id="server-output" class="terminal"></pre>
     </div>
@@ -148,21 +156,20 @@
 
       
 
-      <div class="button-row">
+      <!--div class="button-row">
         <button id="start-client">Start Client</button>
         <button id="stop-client" class="danger">Stop Client</button>
-      </div>
+      </!--div>-->
 
       <pre id="client-output" class="terminal"></pre>
     </div>
 
   </div>
  
-  <div class="left">
+  <div class="panel">
     <h2>Compute metrics</h2>
     <button id="create-graph">Create graph</button>
-
-    <embed id="graph-embed" src="output/graphs/TDL-A.pdf" width="100%" height="800px">
+    <embed id="graph-embed" type="application/pdf" width="100%" height="600px" />
   </div>
 
 

@@ -1063,9 +1063,8 @@ dect_phy_perf_client_report_local_results_and_req_srv_results(int64_t *elapsed_t
 	desh_print("perf tx operation completed:");
 	desh_print("  total amount of data sent: %d bytes",
 		   perf_data.tx_metrics.tx_total_data_amount);
-	desh_print("  packet count:              %d", perf_data.tx_metrics.tx_total_pkt_count);
-	desh_print("  elapsed time:              %.2f seconds", (double)elapsed_time_ms / 1000);
-	desh_print("  data rates:                %.2f kbits/seconds", (perf / 1000));
+	desh_print("  sent packets:              %d", perf_data.tx_metrics.tx_total_pkt_count);
+
 
 	if (perf_data.cmd_params.use_harq) {
 		desh_print("  No HARQ feedback count:                  %d",
@@ -1187,7 +1186,7 @@ static void dect_phy_perf_server_report_local_and_tx_results(void)
 
 	memset(results_str, 0, sizeof(results_str));
 
-	sprintf(results_str, "perf server rx operation from tx id %d:\n",
+	/*sprintf(results_str, "perf server rx operation from tx id %d:\n",
 		perf_data.rx_metrics.rx_last_tx_id);
 	sprintf(results_str + strlen(results_str), "  total amount of data:   %d bytes\n",
 		perf_data.rx_metrics.rx_total_data_amount);
@@ -1219,11 +1218,15 @@ static void dect_phy_perf_server_report_local_and_tx_results(void)
 			perf_data.rx_metrics.rx_phy_transmit_pwr_high));
 	sprintf(results_str + strlen(results_str), "  PCC RX: SNR: min:    %d, max: %d\n",
 		perf_data.rx_metrics.rx_snr_low, perf_data.rx_metrics.rx_snr_high);
+*/
 
 	/*desh_print("server: sending result response of total length: %d:\n\"%s\"\n",
 		   (strlen(results_str) + 1), results_str);*/
 
 	/* Send results to client: */
+
+		
+
 	(void)nrf_modem_dect_phy_cancel(DECT_PHY_PERF_SERVER_RX_HANDLE);
 	if (dect_phy_perf_server_results_tx(results_str)) {
 		desh_error("Cannot start sending server results");
@@ -1333,7 +1336,7 @@ void dect_phy_perf_mdm_op_completed(
 				 */
 				if (perf_data.cmd_params.role == DECT_PHY_COMMON_ROLE_SERVER &&
 				    perf_data.rx_metrics.rx_req_count_on_going == 0 &&
-				    z_delta_ms > 500) {
+				    z_delta_ms > 5000) {
 					struct dect_phy_perf_params copy_params =
 						perf_data.cmd_params;
 
@@ -1501,6 +1504,7 @@ static void dect_phy_perf_thread_fn(void)
 		}
 		case DECT_PHY_PERF_EVENT_SERVER_REPORT: {
 			dect_phy_perf_server_report_local_and_tx_results();
+
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PCC_CRC_ERROR: {
@@ -1519,7 +1523,9 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PCC_ERR,%u.%02u,%d,%d", cmd_params->pdc_number/100, cmd_params->pdc_number%100, perf_data.rx_metrics.rx_latest_mcs, perf_data.rx_metrics.rx_last_seq_nbr+1);
+		/*	desh_print("pcc_err,%s%d.%02d,%d,%d", (cmd_params->pdc_number < 0 ? "-" : ""),
+				   abs(cmd_params->pdc_number) / 100, abs(cmd_params->pdc_number) % 100,
+				   perf_data.rx_metrics.rx_latest_mcs, perf_data.rx_metrics.rx_last_seq_nbr + 1);*/
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PDC_CRC_ERROR: {
@@ -1537,7 +1543,9 @@ static void dect_phy_perf_thread_fn(void)
 					  params->crc_failure.rssi_2,
 					  (params->crc_failure.rssi_2 / 2));
 			}
-			desh_print("PDC_ERR,%u.%02u,%d,%d", cmd_params->pdc_number/100, cmd_params->pdc_number%100, perf_data.rx_metrics.rx_latest_mcs, perf_data.rx_metrics.rx_last_seq_nbr+1);
+		/*	desh_print("pdc_err,%s%d.%02d,%d,%d", (cmd_params->pdc_number < 0 ? "-" : ""),
+				   abs(cmd_params->pdc_number) / 100, abs(cmd_params->pdc_number) % 100,
+				   perf_data.rx_metrics.rx_latest_mcs, perf_data.rx_metrics.rx_last_seq_nbr + 1);*/
 			break;
 		}
 		case DECT_PHY_PERF_EVENT_RX_PCC: {
@@ -1900,10 +1908,18 @@ static int dect_phy_perf_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		perf_data.rx_metrics.rx_last_seq_nbr = pdu.message.tx_data.seq_nbr;
 		perf_data.rx_metrics.rx_last_tx_id = pdu.header.transmitter_id;
 		perf_data.rx_metrics.rx_last_data_received = k_uptime_get();
-		desh_print("pdc,%u.%02u,%d,%d",perf_data.cmd_params.pdc_number/100,perf_data.cmd_params.pdc_number%100,perf_data.rx_metrics.rx_latest_mcs, perf_data.rx_metrics.rx_last_seq_nbr);
+		/*desh_print("pdc,%s%d.%02d,%d,%d", (perf_data.cmd_params.pdc_number < 0 ? "-" : ""),
+			   abs(perf_data.cmd_params.pdc_number) / 100,
+			   abs(perf_data.cmd_params.pdc_number) % 100, perf_data.rx_metrics.rx_latest_mcs,
+			   perf_data.rx_metrics.rx_last_seq_nbr);*/
+			  
 	} else if (pdu.header.message_type == DECT_MAC_MESSAGE_TYPE_PERF_RESULTS_REQ) {
+	
 		if (pdu.header.transmitter_id == perf_data.rx_metrics.rx_last_tx_id) {
-			//desh_print("RESULT_REQ received from tx id %d", pdu.header.transmitter_id);
+			
+			
+			desh_print("Received packets: %d", perf_data.rx_metrics.rx_total_pkt_count);
+			perf_data.rx_metrics.rx_total_pkt_count = 0;
 			
 			dect_phy_perf_msgq_non_data_op_add(DECT_PHY_PERF_EVENT_SERVER_REPORT);
 		} else if (pdu.header.transmitter_id ==

@@ -3,11 +3,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import csv
+import sys
+import os
 
-file_name = "AWGN"
+# Get channel type and data directory from command line arguments
+file_name = sys.argv[1] if len(sys.argv) > 1 else "AWGN"
+data_dir = sys.argv[2] if len(sys.argv) > 2 else "."
+
+# Get today's date folder
+today = datetime.now()
+date_folder = f"measurements_{today.year}-{today.month:02d}-{today.day:02d}"
+measurement_path = os.path.join(data_dir, date_folder, file_name + '.csv')
 
 # === Load CSV ===
-df = pd.read_csv('./measurements_2026-01-16/' + file_name + '.csv')
+df = pd.read_csv(measurement_path)
+# row order: channel,mcs,snr,seq_number
+
 
 '''
 Current measurement settings:
@@ -40,8 +51,16 @@ print("Missing sequence numbers:", missing_seq_count)
 df = df[df['mcs'] >= 0]
 df = df[df['mcs'] <= 4]
 
+# Ensure output directories exist
+cleaned_dir = os.path.join(data_dir, 'output', 'cleaned'+datetime.now().strftime("_%Y%m%d"))
+graphs_dir = os.path.join(data_dir, 'output', 'graphs'+datetime.now().strftime("_%Y%m%d"))
+stats_dir = os.path.join(data_dir, 'output', 'stats'+datetime.now().strftime("_%Y%m%d"))
+os.makedirs(cleaned_dir, exist_ok=True)
+os.makedirs(graphs_dir, exist_ok=True)
+os.makedirs(stats_dir, exist_ok=True)
+
 # Save cleaned CSV
-df.to_csv('output/cleaned/' + file_name + '_clean.csv', index=False)
+df.to_csv(os.path.join(cleaned_dir, file_name + '_clean.csv'), index=False)
 
 # === Assign packet error based on channel ===
 # PDC → 0 (success), PDC_ERR → 1 (error)
@@ -118,7 +137,9 @@ if handles:
     plt.legend(title='MCS')
 
 plt.tight_layout()
-plt.savefig('output/graphs/' + file_name + datetime.now().strftime('%Y-%m-%d') + '.pdf', format='pdf')
+pdf_path = os.path.join(graphs_dir, file_name + '.pdf')
+plt.savefig(pdf_path, format='pdf')
+print(f"Graph saved to: {pdf_path}")
 
 # === Export statistics CSV ===
 csv_data = [['SNR(dB)', 'MCS', 'Current Samples']]
@@ -141,6 +162,8 @@ csv_rows = csv_data[1:]
 csv_rows = sorted(csv_rows, key=lambda x: (int(x[2]), float(x[0])))
 csv_data = [csv_header] + csv_rows
 
-with open('output/stats/statistics_' + file_name.lower() + '.csv', 'w', newline='') as csvfile:
+stats_path = os.path.join(stats_dir, 'statistics_' + file_name.lower() + '.csv')
+with open(stats_path, 'w', newline='') as csvfile:
     writer = csv.writer(csvfile)
     writer.writerows(csv_data)
+print(f"Statistics saved to: {stats_path}")

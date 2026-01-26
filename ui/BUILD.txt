@@ -1,0 +1,15 @@
+# Build EXE
+
+1. Install dependencies:
+```
+npm install
+```
+
+2. Build the EXE:
+```
+npm run build
+```
+
+3. Find the EXE in `dist/` folder
+
+The EXE will work standalone - no Node.js needed. Data files will be stored next to the executable.

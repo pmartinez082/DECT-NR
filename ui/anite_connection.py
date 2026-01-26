@@ -136,99 +136,110 @@ def stdin_reader_thread():
 
 
 def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
+    """
+    Start ANITE emulation, set initial SNR if provided, and listen for commands.
+    Keeps running until a stop command or termination signal.
+    """
     global _socket, _running, _command_queue
     sock = None
+
     try:
-        # Construct emulation path based on type
+        # Determine emulation file
         emulation_file = EMULATION_FILES.get(emulation_type, EMULATION_FILES['AWGN'])
         emulation_path = EMULATION_BASE_PATH + emulation_file
         log(f"Using emulation file: {emulation_path}")
-        
+
+        # Connect to ANITE
         sock = connect()
-        _socket = sock  # Store globally for signal handler
-        
-        # Register signal handlers for clean shutdown
+        _socket = sock  # global reference for signal handler
+
+        # Register termination signal handlers
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
         # Open emulation
         send(sock, f"CALCulate:FILTer:FILE {emulation_path}")
-        check_error(sock)
+        try:
+            check_error(sock)
+        except RuntimeError as e:
+            log(f"Warning (non-fatal) on opening emulation: {e}")
 
-       
-
-        # Run emulation
+        # Start emulation
         send(sock, "DIAG:SIMU:GO")
-        check_error(sock)
+        try:
+            check_error(sock)
+        except RuntimeError as e:
+            log(f"Warning (non-fatal) on starting emulation: {e}")
 
         log("Emulation is running")
-        
-        # Set SNR if provided
-        if snr_db is not None:
-            set_snr(sock, interferer=1, snr_db=snr_db)
-            check_error(sock)
-            log(f"SNR set to {snr_db} dB")
 
-        # Start stdin reader thread (works on Windows)
+        # Set initial SNR if provided
+        if snr_db is not None:
+            try:
+                set_snr(sock, interferer=1, snr_db=snr_db)
+                try:
+                    check_error(sock)
+                except RuntimeError as e:
+                    log(f"Warning (non-fatal) when setting SNR: {e}")
+                log(f"SNR set to {snr_db} dB")
+            except Exception as e:
+                log(f"Error setting SNR: {e}")
+
+        # Start stdin thread to receive SNR update commands
         _running = True
         stdin_thread = threading.Thread(target=stdin_reader_thread, daemon=True)
         stdin_thread.start()
-        
+
         log("Emulation running. Listening for SNR update commands...")
+
         import time
-        
-        try:
-            while _running:
-                # Check for pending commands
-                with _command_lock:
-                    if _command_queue:
-                        command = _command_queue.pop(0)
-                    else:
-                        command = None
-                
-                if command:
-                    log(f"Received command: {command}")
-                    
-                    # Parse SNR update command: snr_update:value:channel
-                    if command.startswith('snr_update:'):
-                        parts = command.split(':')
-                        if len(parts) >= 3:
+        while _running:
+            command = None
+            with _command_lock:
+                if _command_queue:
+                    command = _command_queue.pop(0)
+
+            if command:
+                log(f"Received command: {command}")
+
+                if command.startswith('snr_update:'):
+                    parts = command.split(':')
+                    if len(parts) >= 3:
+                        try:
+                            new_snr = float(parts[1])
+                            log(f"Updating SNR to {new_snr} dB")
+                            set_snr(sock, interferer=1, snr_db=new_snr)
                             try:
-                                new_snr = float(parts[1])
-                                log(f"Updating SNR to {new_snr} dB")
-                                set_snr(sock, interferer=1, snr_db=new_snr)
                                 check_error(sock)
-                                log(f"SNR updated to {new_snr} dB")
-                            except (ValueError, RuntimeError) as e:
-                                log(f"Error updating SNR: {e}")
-                    
-                    elif command == 'stop':
-                        log("Stop command received")
-                        _running = False
-                        break
-                
-                time.sleep(0.1)  # Short sleep to avoid busy-waiting
-                
-        except KeyboardInterrupt:
-            log("Keyboard interrupt received")
-            _running = False
-       
+                            except RuntimeError as e:
+                                log(f"Warning (non-fatal) when updating SNR: {e}")
+                            log(f"SNR updated to {new_snr} dB")
+                        except (ValueError, RuntimeError) as e:
+                            log(f"Error parsing/updating SNR: {e}")
+
+                elif command == 'stop':
+                    log("Stop command received")
+                    _running = False
+                    break
+
+            time.sleep(0.1)  # avoid busy-waiting
+
         return 0
 
     except Exception as e:
         log(f"ERROR: {e}")
         return 1
+
     finally:
         _running = False
         if sock:
             try:
-                close_emulation(sock)
+                close_emulation(sock)  # safely close emulation
                 sock.close()
             except Exception as e:
                 log(f"Error closing connection: {e}")
-        
         _socket = None
-
+        log("ANITE emulation fully terminated")
 
 if __name__ == "__main__":
     snr = None

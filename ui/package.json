@@ -1,20 +1,49 @@
 {
-  "name": "ui",
+  "name": "dect-ui",
   "version": "1.0.0",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "DECT NR UI",
   "devDependencies": {
-    "electron": "^39.2.6"
+    "electron": "^39.2.6",
+    "electron-builder": "^25.1.7"
   },
   "dependencies": {
     "serialport": "^13.0.0",
     "strip-ansi": "^7.1.2"
+  },
+  "build": {
+    "appId": "com.dect.nrui",
+    "productName": "DECT NR UI",
+    "forceCodeSigning": false,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "style.css",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
+  },
+  "prebuild-token": {
+    "@serialport/bindings-cpp": true
   }
 }

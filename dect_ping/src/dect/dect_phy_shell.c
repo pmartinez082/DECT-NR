@@ -213,8 +213,8 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 	params.tx_mcs = current_settings->tx.mcs;
 	params.role = DECT_PHY_COMMON_ROLE_NONE;
 	params.channel = 1677;
-	params.slot_count = 2;
-	params.slot_gap_count = 2;
+	
+	params.slot_gap_count = 1;
 	params.subslot_gap_count = 0; /* As a default, in slots. */
 	params.destination_transmitter_id = DECT_PHY_DEFAULT_TRANSMITTER_LONG_RD_ID;
 	params.expected_rx_rssi_level = current_settings->rx.expected_rssi_level;
@@ -261,7 +261,11 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 		case 'p': {
 			/* Parse decimal input and store as integer * 100 */
 			float temp_val = strtof(optarg, NULL);
-			params.pdc_number = (uint32_t)(temp_val * 100 + 0.5f);
+			if (temp_val >= 0) {
+				params.pdc_number = (int32_t)(temp_val * 100 + 0.5f);
+			} else {
+				params.pdc_number = (int32_t)(temp_val * 100 - 0.5f);
+			}
 			break;
 		}
 		case DECT_SHELL_PERF_DEST_SERVER_TX_ID: {
@@ -367,19 +371,20 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 			int min_slot;
 			int max_slot;
 		} client_mcs_defaults[] = {
-			{0, 2, 16},
-			{1, 1, 16},
-			{2, 1, 15},
-			{3, 1, 11},
-			{4, 1, 8},
-		};
+	{0, 1, 8}, 
+	{1, 1, 8},
+	{2, 1, 7},
+	{3, 1, 5},
+	{4, 1, 4},
+};
+
 		int mcs_count = sizeof(client_mcs_defaults) / sizeof(client_mcs_defaults[0]);
 
 		/* Look up defaults based on MCS */
 		for (int i = 0; i < mcs_count; i++) {
 			if (client_mcs_defaults[i].mcs == params.tx_mcs) {
 				if (!c_slots_set) {
-					params.slot_count = client_mcs_defaults[i].min_slot;
+					params.slot_count = client_mcs_defaults[i].max_slot;
 				}
 				desh_print("CLIENT MCS %d: c_slots=%d (range: %d-%d)",
 					   params.tx_mcs, params.slot_count, 
@@ -388,6 +393,8 @@ static int dect_phy_perf_cmd(const struct shell *shell, size_t argc, char **argv
 			}
 		}
 	}
+
+
 
 	if (params.subslot_gap_count) {
 		params.slot_gap_count_in_mdm_ticks =
@@ -569,7 +576,7 @@ static int dect_phy_rf_tool_cmd(const struct shell *shell, size_t argc, char **a
 	params.continuous = false;
 	params.frame_repeat_count = 15;
 	params.frame_repeat_count_intervals = 5;
-
+	
 	params.rx_frame_start_offset = 0;
 	params.rx_subslot_count = 5;
 	params.rx_post_idle_subslot_count = 5;
@@ -1981,4 +1988,3 @@ SHELL_SUBCMD_ADD((dect), ping_server, NULL,
 		 "dect ping server command.\n"
 		 " Usage: dect ping_server [options: see: dect ping_server -h]",
 		 dect_ping_server, 1, 35);	
-

@@ -2264,7 +2264,7 @@ static int dect_phy_ping_rx_pdc_data_handle(struct dect_phy_data_rcv_common_para
 		desh_warn("type %d", pdu.header.message_type);
 	}
 	
-desh_print("PDC,%d,%d", params->mcs, params->snr);
+
 
 	return 0;
 }
