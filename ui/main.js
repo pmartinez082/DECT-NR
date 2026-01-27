@@ -9,6 +9,19 @@ let emulationProcess = null;
 
 /* ===================== GLOBAL STATE ===================== */
 
+
+// --- Watchdog ---
+let PERF_TIMER = 50;              // seconds (default)
+let WATCHDOG_TIMEOUT_MS = 2 * PERF_TIMER * 1000;
+
+let lastSerialActivity = Date.now();
+let watchdogTimer = null;
+
+// Last commands sent
+let lastServerCmd = null;
+let lastClientCmd = null;
+
+
 let win;
 let currentSentPackets = null;
 let currentReceivedPackets = null;
@@ -30,8 +43,7 @@ let sweepParams = null;
 
 let sweepCurrentMcsIndex = 0;
 let sweepCurrentSnr = 0;
-
-
+let selectedFilename = 'AWGN';
 
 function initializeDataDir() {
   if (app.isPackaged) {
@@ -47,10 +59,17 @@ function initializeDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
   }
+
+  // Dynamic filename selection from UI
+
+function getCSVPath() {
+  const dateFolder = getTodaysDateFolder();
+  return path.join(DATA_DIR, dateFolder, selectedFilename + '.csv');
+}
 }
 
-// Dynamic filename selection from UI
-let selectedFilename = 'TDL-A';
+
+
 // Ensure CSV directory exists
 function ensureCSVDirectory() {
   try {
@@ -193,10 +212,8 @@ async function stopClientInternal() {
       clientPort = null;
       clientPortOpen = false;
 
-      // Final fallback reset
-      resetBoard(path, 'CLIENT_STOP', () => {
-        log('[CLIENT] Board reset complete');
-      });
+      
+     
     });
   } catch (e) {
     log('[CLIENT] Exception closing port: ' + e.message);
@@ -249,10 +266,7 @@ async function stopServerInternal() {
       serverPort = null;
       serverPortOpen = false;
 
-      // Final fallback reset
-      resetBoard(path, 'SERVER_STOP', () => {
-        log('[SERVER] Board reset complete');
-      });
+      
     });
   } catch (e) {
     log('[SERVER] Exception closing port: ' + e.message);
@@ -374,8 +388,10 @@ function processIncomingChunkForBuffer(bufferName, rawChunk) {
 
     // --- Log everything immediately ---
     if (bufferName === 'server') {
+       win.webContents.send('server-output', l + '\n');
       log(`[SERVER SERIAL] ${l}`);
     } else {
+      win.webContents.send('client-output', l + '\n');
       log(`[CLIENT SERIAL] ${l}`);
     }
 
@@ -399,6 +415,7 @@ function processIncomingChunkForBuffer(bufferName, rawChunk) {
       }
     }
   });
+  lastSerialActivity = Date.now();
   return completeLines;
 }
 
@@ -416,10 +433,15 @@ function checkMeasurementComplete() {
     stopServer();
     stopClient();
 
-    // Advance SNR
-    advanceSweep();
+  if (['TDL-A','TDL-B','TDL-C'].includes(sweepParams.channelType)) {
+      advanceSweepTDL();
+  } else {
+      advanceSweepNormal();
+  }
+
   }
 }
+
 
 
 
@@ -482,6 +504,7 @@ function startServer(serial, snr) {
     if (!serverPort || !serverPortOpen) return;
 
     const cmd = `dect perf -s --pdc_number=${snr}\n`;
+    lastServerCmd = { serial, cmd };
     log(`[SERVER] TX: ${cmd.trim()}`);
     serverPort.write(cmd);
   }, 200);
@@ -500,9 +523,10 @@ function startClient(serial, mcs) {
 
   setTimeout(() => {
     if (!clientPort || !clientPortOpen) return;
-    const cmd = `dect perf -c --c_tx_mcs ${mcs} --c_tx_pwr -20 -t 20\n`;
+    const cmd = `dect perf -c --c_tx_mcs ${mcs} --c_tx_pwr -20 -t ${PERF_TIMER}\n`;
     log(`[CLIENT] TX: ${cmd.trim()}`);
     clientPort.write(cmd);
+    lastClientCmd = { serial, cmd };
   }, 200);
 }
 
@@ -510,6 +534,19 @@ function startClient(serial, mcs) {
 async function runNextSweepPoint(serverSerial, clientSerial) {
   if (!sweepActive || !sweepParams) return;
 
+  const { enabledMcs, snrRanges, channelType } = sweepParams;
+
+
+ // Check if this is a TDL channel
+  const isTDL = ['TDL-A', 'TDL-B', 'TDL-C'].includes(channelType);
+
+  if (isTDL) {
+    await runNextSweepPointTDL(serverSerial, clientSerial);
+  } else {
+    await runNextSweepPointNormal(serverSerial, clientSerial);
+  }
+}
+async function runNextSweepPointNormal(serverSerial, clientSerial) {
   const { enabledMcs, snrRanges, channelType } = sweepParams;
   const mcs = enabledMcs[sweepCurrentMcsIndex];
   const snr = sweepCurrentSnr;
@@ -533,7 +570,105 @@ async function runNextSweepPoint(serverSerial, clientSerial) {
     startServer(serverSerial, snr);
     startClient(clientSerial, mcs);
   }, 500);
+
 }
+function advanceSweepNormal() {
+  const { enabledMcs, snrRanges } = sweepParams;
+  const mcs = enabledMcs[sweepCurrentMcsIndex];
+  const range = snrRanges[mcs];
+
+  sweepCurrentSnr += range.step;
+
+  if (sweepCurrentSnr > range.max) {
+    sweepCurrentMcsIndex++;
+    if (sweepCurrentMcsIndex >= enabledMcs.length) {
+      log('[SWEEP] === SWEEP COMPLETE ===');
+      sweepActive = false;
+      return;
+    }
+    sweepCurrentSnr = snrRanges[enabledMcs[sweepCurrentMcsIndex]].min;
+  }
+
+  setTimeout(() => {
+    runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
+  }, 5000);
+}
+
+/* -------- TDL SPECIAL CASE -------- */
+async function runNextSweepPointTDL(serverSerial, clientSerial) {
+  const { enabledMcs, snrRanges, channelType } = sweepParams;
+  const mcs = enabledMcs[sweepCurrentMcsIndex];
+  const range = snrRanges[mcs];
+
+  if (!sweepParams.tdlRepetition) sweepParams.tdlRepetition = 0;
+  const repetition = sweepParams.tdlRepetition;
+
+  const seed = getTDLSeed(repetition);
+
+  currentSentPackets = null;
+  currentReceivedPackets = null;
+  currentSnrForMeasurement = sweepCurrentSnr;
+
+  log(`[SWEEP TDL] MCS=${mcs}, SNR=${sweepCurrentSnr}, repetition=${repetition + 1}/5, seed=${seed}`);
+
+  if (emulationProcess) {
+    await updateAniteSeed(seed, channelType);
+  }
+
+  await stopServerInternal();
+  await stopClientInternal();
+
+  setTimeout(() => {
+    startServer(serverSerial, sweepCurrentSnr);
+    startClient(clientSerial, mcs);
+  }, 500);
+}
+
+// Advance sweep for TDL channel
+function advanceSweepTDL() {
+  const { enabledMcs, snrRanges } = sweepParams;
+  const mcs = enabledMcs[sweepCurrentMcsIndex];
+  const range = snrRanges[mcs];
+
+  if (!sweepParams.tdlRepetition) sweepParams.tdlRepetition = 0;
+
+  sweepParams.tdlRepetition++;
+
+  if (sweepParams.tdlRepetition < 5) {
+    // Repeat same point with next seed
+    setTimeout(() => {
+      runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
+    }, 5000);
+    return;
+  }
+
+  // Reset repetition for next SNR
+  sweepParams.tdlRepetition = 0;
+
+  // Advance SNR
+  sweepCurrentSnr += range.step;
+
+  if (sweepCurrentSnr > range.max) {
+    sweepCurrentMcsIndex++;
+    if (sweepCurrentMcsIndex >= enabledMcs.length) {
+      log('[SWEEP TDL] === SWEEP COMPLETE ===');
+      sweepActive = false;
+      return;
+    }
+    sweepCurrentSnr = snrRanges[enabledMcs[sweepCurrentMcsIndex]].min;
+  }
+
+  setTimeout(() => {
+    runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
+  }, 5000);
+}
+
+// Seeds for TDL repetitions
+function getTDLSeed(repetitionIndex) {
+  const seeds = [1001, 2002, 3003, 4004, 5005];
+  return seeds[repetitionIndex % seeds.length];
+}
+
 
 
 
@@ -543,6 +678,25 @@ async function runNextSweepPoint(serverSerial, clientSerial) {
 
 
 /* ===================== ANITE ===================== */
+
+
+async function updateAniteSeed(seed, channelType) {
+  if (!emulationProcess) return Promise.reject('No ANITE process');
+
+  const cmd = `seed_update:${seed}:${channelType}\n`;
+  return new Promise(resolve => {
+    const onData = (data) => {
+      const str = data.toString();
+      if (str.includes(`Seed updated to ${seed}`)) {
+        emulationProcess.stdout.off('data', onData);
+        resolve();
+      }
+    };
+    emulationProcess.stdout.on('data', onData);
+    emulationProcess.stdin.write(cmd);
+  });
+}
+
 function updateAniteSNR(snrValue, channelType) {
   if (!emulationProcess) {
     log(`[SWEEP SNR UPDATE] No ANITE process running, cannot update SNR`);
@@ -629,14 +783,67 @@ ipcMain.on('select-filename', (event, { filename }) => {
   log(`[FILENAME] Selected: ${selectedFilename}, CSV path: ${CSV_PATH}`);
 });
 
+
+
+function startWatchdog() {
+  if (watchdogTimer) clearInterval(watchdogTimer);
+
+  watchdogTimer = setInterval(async () => {
+    const now = Date.now();
+    const delta = now - lastSerialActivity;
+
+    if (delta > WATCHDOG_TIMEOUT_MS) {
+      log('[WATCHDOG] No serial response for 2 minutes — recovering');
+
+      lastSerialActivity = Date.now(); // prevent loop storms
+
+      await stopServerInternal();
+      await stopClientInternal();
+
+      // Small delay to let boards reset
+      setTimeout(() => {
+        if (lastServerCmd) {
+          log('[WATCHDOG] Re-sending last server command');
+          startServer(lastServerCmd.serial, extractSnr(lastServerCmd.cmd));
+        }
+
+        if (lastClientCmd) {
+          log('[WATCHDOG] Re-sending last client command');
+          startClient(lastClientCmd.serial, extractMcs(lastClientCmd.cmd));
+        }
+      }, 1000);
+    }
+  }, 20000); // check every 20s
+}
+function extractSnr(cmd) {
+  const m = cmd.match(/--pdc_number=([-\d.]+)/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+function extractMcs(cmd) {
+  const m = cmd.match(/--c_tx_mcs\s+(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+
+
+
+
 /* ===================== DATA DIRECTORY IPC ===================== */
-ipcMain.on('start-sweep', (event, { snrRanges, channelType, serverSerial, clientSerial, snrStep }) => {
+ipcMain.on('start-sweep', (event, { snrRanges, channelType, serverSerial, clientSerial, snrStep, sweepTimer }) => {
   if (sweepActive) {
     log('[SWEEP] Sweep already running');
     return;
   }
   
-  
+    // --- Apply sweep timer from UI ---
+  PERF_TIMER = Number(sweepTimer) || 50;
+  WATCHDOG_TIMEOUT_MS = 1.2 * PERF_TIMER * 1000;
+
+  log(`[SWEEP] Perf timer set to ${PERF_TIMER}s`);
+  log(`[WATCHDOG] Timeout set to ${WATCHDOG_TIMEOUT_MS / 1000}s`);
+
+  startWatchdog();
 
   const enabledMcs = [];
   const normalizedRanges = {};
@@ -721,10 +928,34 @@ ipcMain.on('start-sweep', (event, { snrRanges, channelType, serverSerial, client
 
 
 ipcMain.on('stop-sweep', () => {
-  log('[SWEEP] Stopped');
+  
+   log('[SWEEP] Stop sweep requested');
+  
+  stopServerInternal();
+  stopClientInternal();
   sweepActive = false;
-  stopServer();
-  stopClient();
+  sweepRunning = false;
+  sweepCurrentSnr = 0;
+  sweepMaxSnr = 0;
+  sweepCurrentMcs = 0;
+  sweepMaxMcs = 4;
+  sweepEvent = null;
+  sweepParams = null;
+  
+  if (emulationProcess) {
+    try {
+      emulationProcess.kill();
+      emulationProcess = null;
+    } catch (e) {
+      log(`[SWEEP] Error stopping Anite: ${e.message}`);
+    }
+  }
+
+  if (watchdogTimer) {
+  clearInterval(watchdogTimer);
+  watchdogTimer = null;
+}
+
 });
 
 ipcMain.handle('get-data-dir', async () => {
@@ -764,3 +995,5 @@ ipcMain.on('create-graph', (event, { channelType }) => {
     }
   });
 });
+
+
