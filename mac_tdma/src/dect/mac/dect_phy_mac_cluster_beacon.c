@@ -730,7 +730,7 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 	tx_op.phy_header = &phy_header;
 	tx_op.phy_type = DECT_PHY_HEADER_TYPE2;
 	tx_op.handle = DECT_PHY_MAC_BEACON_RA_RESP_TX_HANDLE;
-	tx_op.start_time = resp_start_time;
+	tx_op.start_time = resp_start_time + (DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS * 100);
 
 	/* Ensure start_time is not in the past relative to modem time and scheduler latency.
 	 * If computed start_time is too late (i.e., already past), move it forward to
@@ -742,7 +742,16 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 			(US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us));
 		if (tx_op.start_time < min_start) {
 			uint64_t old = tx_op.start_time;
-			tx_op.start_time = min_start + DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS;
+			/* Use modem-reported minimum margin between ops to ensure we
+			 * schedule far enough in the future for the modem to accept
+			 * the TX operation. This provides a larger, more robust safety
+			 * buffer than a single subslot.
+			 */
+			uint64_t margin = dect_phy_ctrl_modem_latency_min_margin_between_ops_get();
+			if (!margin) {
+				margin = DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS;
+			}
+			tx_op.start_time = min_start + margin;
 			desh_warn("(%s): Adjusted resp_start_time from %lld to %lld to account for modem latency/scheduling delay",
 				__func__, (long long)old, (long long)tx_op.start_time);
 		}

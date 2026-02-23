@@ -182,19 +182,42 @@ static int dect_phy_mac_client_data_pdu_encode(struct dect_phy_mac_rach_tx_param
 	/* Length so far  */
 	uint16_t encoded_pdu_length = pdu_ptr - *target_ptr;
 
-	header.packet_length = dect_common_utils_phy_packet_length_calculate(
-		encoded_pdu_length, header.packet_length_type, header.df_mcs);
-	if (header.packet_length < 0) {
-		desh_error("(%s): Phy pkt len calculation failed", (__func__));
-		return -EINVAL;
-	}
-	int16_t total_byte_count =
-		dect_common_utils_slots_in_bytes(header.packet_length, header.df_mcs);
+	/* Determine a supported packet length (0..7 => 1..8 slots) for the
+	 * requested MCS that can contain the encoded PDU. If no packet length
+	 * fits, try lowering the MCS until a supported combination is found.
+	 */
+	int chosen_pkt_len = -1;
+	int chosen_mcs = header.df_mcs;
+	int16_t total_byte_count = 0;
 
-	if (total_byte_count <= 0) {
+	for (int try_mcs = header.df_mcs; try_mcs >= 0 && chosen_pkt_len < 0; try_mcs--) {
+		for (int pkt_len = 0; pkt_len <= 7; pkt_len++) {
+			int16_t tc = dect_common_utils_slots_in_bytes(pkt_len, try_mcs);
+			if (tc <= 0) {
+				continue;
+			}
+			if ((int)tc >= encoded_pdu_length) {
+				chosen_pkt_len = pkt_len;
+				chosen_mcs = try_mcs;
+				total_byte_count = tc;
+				break;
+			}
+		}
+	}
+
+	if (chosen_pkt_len < 0) {
 		desh_error("Unsupported slot/mcs combination");
 		return -EINVAL;
 	}
+
+	if (chosen_mcs != header.df_mcs) {
+		desh_warn("(%s): lowering MCS from %d to %d to fit payload",
+				  __func__, header.df_mcs, chosen_mcs);
+		header.df_mcs = chosen_mcs;
+	}
+
+	header.packet_length = chosen_pkt_len;
+
 	/* Fill padding if needed */
 	int16_t padding_need = total_byte_count - encoded_pdu_length;
 
