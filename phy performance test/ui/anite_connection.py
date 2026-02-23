@@ -219,6 +219,7 @@ def main(snr_db: float = None, emulation_type: str = 'AWGN') -> int:
 
                 elif command == 'stop':
                     log("Stop command received")
+                    send(sock, "DIAG:SIMU:STOP")
                     _running = False
                     break
 

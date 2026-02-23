@@ -433,11 +433,7 @@ function checkMeasurementComplete() {
     stopServer();
     stopClient();
 
-  if (['TDL-A','TDL-B','TDL-C'].includes(sweepParams.channelType)) {
-      advanceSweepTDL();
-  } else {
-      advanceSweepNormal();
-  }
+    advanceSweep();
 
   }
 }
@@ -523,7 +519,7 @@ function startClient(serial, mcs) {
 
   setTimeout(() => {
     if (!clientPort || !clientPortOpen) return;
-    const cmd = `dect perf -c --c_tx_mcs ${mcs} --c_tx_pwr -20 -t ${PERF_TIMER}\n`;
+    const cmd = `dect perf -c --c_tx_mcs ${mcs} --c_tx_pwr -30 -t ${PERF_TIMER}\n`;
     log(`[CLIENT] TX: ${cmd.trim()}`);
     clientPort.write(cmd);
     lastClientCmd = { serial, cmd };
@@ -534,20 +530,7 @@ function startClient(serial, mcs) {
 async function runNextSweepPoint(serverSerial, clientSerial) {
   if (!sweepActive || !sweepParams) return;
 
-  const { enabledMcs, snrRanges, channelType } = sweepParams;
-
-
- // Check if this is a TDL channel
-  const isTDL = ['TDL-A', 'TDL-B', 'TDL-C'].includes(channelType);
-
-  if (isTDL) {
-    await runNextSweepPointTDL(serverSerial, clientSerial);
-  } else {
-    await runNextSweepPointNormal(serverSerial, clientSerial);
-  }
-}
-async function runNextSweepPointNormal(serverSerial, clientSerial) {
-  const { enabledMcs, snrRanges, channelType } = sweepParams;
+   const { enabledMcs, snrRanges, channelType } = sweepParams;
   const mcs = enabledMcs[sweepCurrentMcsIndex];
   const snr = sweepCurrentSnr;
 
@@ -570,132 +553,19 @@ async function runNextSweepPointNormal(serverSerial, clientSerial) {
     startServer(serverSerial, snr);
     startClient(clientSerial, mcs);
   }, 500);
+    
 
 }
-function advanceSweepNormal() {
-  const { enabledMcs, snrRanges } = sweepParams;
-  const mcs = enabledMcs[sweepCurrentMcsIndex];
-  const range = snrRanges[mcs];
-
-  sweepCurrentSnr += range.step;
-
-  if (sweepCurrentSnr > range.max) {
-    sweepCurrentMcsIndex++;
-    if (sweepCurrentMcsIndex >= enabledMcs.length) {
-      log('[SWEEP] === SWEEP COMPLETE ===');
-      sweepActive = false;
-      return;
-    }
-    sweepCurrentSnr = snrRanges[enabledMcs[sweepCurrentMcsIndex]].min;
-  }
-
-  setTimeout(() => {
-    runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
-  }, 5000);
-}
-
-/* -------- TDL SPECIAL CASE -------- */
-async function runNextSweepPointTDL(serverSerial, clientSerial) {
-  const { enabledMcs, snrRanges, channelType } = sweepParams;
-  const mcs = enabledMcs[sweepCurrentMcsIndex];
-  const range = snrRanges[mcs];
-
-  if (!sweepParams.tdlRepetition) sweepParams.tdlRepetition = 0;
-  const repetition = sweepParams.tdlRepetition;
-
-  const seed = getTDLSeed(repetition);
-
-  currentSentPackets = null;
-  currentReceivedPackets = null;
-  currentSnrForMeasurement = sweepCurrentSnr;
-
-  log(`[SWEEP TDL] MCS=${mcs}, SNR=${sweepCurrentSnr}, repetition=${repetition + 1}/5, seed=${seed}`);
-
-  if (emulationProcess) {
-    await updateAniteSeed(seed, channelType);
-  }
-
-  await stopServerInternal();
-  await stopClientInternal();
-
-  setTimeout(() => {
-    startServer(serverSerial, sweepCurrentSnr);
-    startClient(clientSerial, mcs);
-  }, 500);
-}
-
-// Advance sweep for TDL channel
-function advanceSweepTDL() {
-  const { enabledMcs, snrRanges } = sweepParams;
-  const mcs = enabledMcs[sweepCurrentMcsIndex];
-  const range = snrRanges[mcs];
-
-  if (!sweepParams.tdlRepetition) sweepParams.tdlRepetition = 0;
-
-  sweepParams.tdlRepetition++;
-
-  if (sweepParams.tdlRepetition < 5) {
-    // Repeat same point with next seed
-    setTimeout(() => {
-      runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
-    }, 5000);
-    return;
-  }
-
-  // Reset repetition for next SNR
-  sweepParams.tdlRepetition = 0;
-
-  // Advance SNR
-  sweepCurrentSnr += range.step;
-
-  if (sweepCurrentSnr > range.max) {
-    sweepCurrentMcsIndex++;
-    if (sweepCurrentMcsIndex >= enabledMcs.length) {
-      log('[SWEEP TDL] === SWEEP COMPLETE ===');
-      sweepActive = false;
-      return;
-    }
-    sweepCurrentSnr = snrRanges[enabledMcs[sweepCurrentMcsIndex]].min;
-  }
-
-  setTimeout(() => {
-    runNextSweepPoint(sweepParams.serverSerial, sweepParams.clientSerial);
-  }, 5000);
-}
-
-// Seeds for TDL repetitions
-function getTDLSeed(repetitionIndex) {
-  const seeds = [1001, 2002, 3003, 4004, 5005];
-  return seeds[repetitionIndex % seeds.length];
-}
 
 
 
 
-
-
-/* ===================== IPC ===================== */
 
 
 /* ===================== ANITE ===================== */
 
 
-async function updateAniteSeed(seed, channelType) {
-  if (!emulationProcess) return Promise.reject('No ANITE process');
 
-  const cmd = `seed_update:${seed}:${channelType}\n`;
-  return new Promise(resolve => {
-    const onData = (data) => {
-      const str = data.toString();
-      if (str.includes(`Seed updated to ${seed}`)) {
-        emulationProcess.stdout.off('data', onData);
-        resolve();
-      }
-    };
-    emulationProcess.stdout.on('data', onData);
-    emulationProcess.stdin.write(cmd);
-  });
-}
 
 function updateAniteSNR(snrValue, channelType) {
   if (!emulationProcess) {
@@ -731,6 +601,21 @@ function updateAniteSNR(snrValue, channelType) {
 }
 
 
+function stopAniteEmulation() {
+  if (!emulationProcess) {
+    log('[ANITE] No emulation process running');
+    return;
+  }
+  try {
+    emulationProcess.stdin.write('stop\n', 'utf-8');
+    emulationProcess.kill();
+    emulationProcess = null;
+    log('[ANITE] Emulation stopped');
+  }
+  catch (e) {
+    log(`[ANITE] Error stopping emulation: ${e.message}`);
+  }
+}
 ipcMain.on('test-connection', () => {
   log('[ANITE] Test connection requested');
   //run anite_connection.py
@@ -944,8 +829,7 @@ ipcMain.on('stop-sweep', () => {
   
   if (emulationProcess) {
     try {
-      emulationProcess.kill();
-      emulationProcess = null;
+      stopAniteEmulation();
     } catch (e) {
       log(`[SWEEP] Error stopping Anite: ${e.message}`);
     }

@@ -22,8 +22,7 @@ df = pd.read_csv(measurement_path)
 
 '''
 Current measurement settings:
-- slot count: 2
-- slot gap count: 2
+
 - subslot gap count: 0
 - channel: 1677
 - power = -20 dBm
