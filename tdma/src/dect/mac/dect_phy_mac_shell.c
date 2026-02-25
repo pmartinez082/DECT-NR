@@ -272,7 +272,6 @@ static const char dect_phy_mac_associate_cmd_usage_str[] =
 	"Sends Association Request.\n"
 	"Options:\n"
 	"  -t, --long_rd_id <id>,  Target long rd id. Default: 38.\n"
-	"  -s, --slot <id>,        Optional explicit TDMA slot index to use (0..N-1).\n"
 	"  -p, --tx_pwr <integer>, TX power (dBm). Default: 0 dBm.\n"
 	"  -m, --tx_mcs <integer>, TX MCS (integer). Default: 0.\n"
 	"Note: LBT (Listen Before Talk) is enabled as a default for a min period,\n"
@@ -283,7 +282,6 @@ static const char dect_phy_mac_associate_cmd_usage_str[] =
 static struct option long_options_associate[] = {{"tx_pwr", required_argument, 0, 'p'},
 						 {"tx_mcs", required_argument, 0, 'm'},
 						 {"long_rd_id", required_argument, 0, 't'},
-						 {"slot", required_argument, 0, 's'},
 						 {0, 0, 0, 0}};
 
 static int dect_phy_mac_associate_cmd(const struct shell *shell, size_t argc, char **argv)
@@ -299,7 +297,6 @@ static int dect_phy_mac_associate_cmd(const struct shell *shell, size_t argc, ch
 	params.tx_power_dbm = 0;
 	params.mcs = 0;
 	params.target_long_rd_id = 38;
-	params.assigned_slot = -1;
 
 	while ((opt = getopt_long(argc, argv, "p:m:t:h", long_options_associate,
 				  &long_index)) != -1) {
@@ -308,14 +305,6 @@ static int dect_phy_mac_associate_cmd(const struct shell *shell, size_t argc, ch
 			params.target_long_rd_id = shell_strtoul(optarg, 10, &ret);
 			if (ret) {
 				desh_error("Give decent tx id (> 0)");
-				return -EINVAL;
-			}
-			break;
-		}
-		case 's': {
-			params.assigned_slot = shell_strtoul(optarg, 10, &ret);
-			if (ret) {
-				desh_error("Invalid slot index");
 				return -EINVAL;
 			}
 			break;

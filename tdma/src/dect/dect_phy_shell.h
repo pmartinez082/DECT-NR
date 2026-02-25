@@ -194,6 +194,7 @@ struct dect_phy_common_op_event_msgq_item {
 #define DECT_PHY_MAC_CLIENT_ASSOCIATION_RX_HANDLE	1004
 #define DECT_PHY_MAC_CLIENT_ASSOCIATION_REL_TX_HANDLE	1005
 #define DECT_PHY_MAC_CLIENT_ASSOCIATED_BG_SCAN		1006
+#define DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE 		1007
 /* Following handles from DECT_PHY_MAC_CLIENT_ASSOCIATED_BG_SCAN + 1 to DECT_PHY_MAC_MAX_NEIGBORS
  * are reserved for associated bg scannings.
  */

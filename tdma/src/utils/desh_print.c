@@ -75,23 +75,6 @@ void desh_fprintf_valist(enum desh_print_level print_level, const char *fmt, va_
 {
 	int chars = 0;
 
-	/* If we are in an ISR, avoid mutexes and shell APIs. Use printk with a
-	 * temporary buffer (no timestamp) because ISR context cannot use blocking
-	 * kernel primitives.
-	 */
-	if (k_is_in_isr()) {
-		char isr_buf[256];
-		int n = vsnprintf(isr_buf, sizeof(isr_buf), fmt, args);
-		if (n < 0) {
-			/* fallback */
-			printk("desh_print (isr): fmt error\n");
-		} else {
-			/* Print directly; do not use shell APIs in ISR */
-			printk("%s", isr_buf);
-		}
-		return;
-	}
-
 	k_mutex_lock(&desh_print_buf_mutex, K_FOREVER);
 
 	/* Add timestamp to print buffer if requested */

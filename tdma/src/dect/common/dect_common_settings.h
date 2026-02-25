@@ -126,10 +126,6 @@ struct dect_phy_settings {
 
 	/* Common scheduler settings */
 	struct dect_phy_settings_scheduler scheduler;
-
-	/* TDMA related settings */
-	bool tdma_enabled; /* If true, use TDMA slot scheduling instead of RA */
-	uint32_t tdma_slot_count; /* 0 = automatic (derived from beacon interval) */
 };
 
 int dect_common_settings_defaults_set(void);

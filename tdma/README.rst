@@ -228,28 +228,6 @@ Throughput performance testing
 
 DeSh command: ``dect perf``
 
-MCS and TDMA notes
--------------------
-
-* Default TX MCS is **0** (lowest rate / highest robustness). You can change the default MCS
-   used by commands via the settings or per-command options:
-
-   - Change global default MCS: ``dect sett --tx_mcs <mcs>`` (0-4).
-   - Override client TX MCS for perf: ``dect perf -c --c_tx_mcs <mcs>`` or use
-      ``--c_tx_mcs`` on other client-side commands.
-
-* Payload / slot sizing: the implementation now caps any automatically appended filler
-   payload based on the selected MCS and supported slot/subslot transport-block sizes.
-   This prevents runtime failures such as "Unsupported slot/mcs combination" when the
-   user requests large payloads with a high MCS. If you need larger payloads, either
-   use a lower MCS (for example ``--c_tx_mcs 0``) or reduce the number of TX slots.
-
-* TDMA mode: a minimal TDMA feature is available. Toggle it with
-   ``dect sett --tdma_enable 1`` and optionally set the per-beacon slot count with
-   ``dect sett --tdma_slot_count <N>``. The central beacon may also assign explicit
-   per-association slots to clients; assigned slots will be printed in the logs.
-
-
 Perf is a tool for testing the throughput performance.
 
 The ``perf`` command uses its own proprietary PDU format and protocol.

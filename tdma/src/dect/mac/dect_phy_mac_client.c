@@ -48,7 +48,6 @@ struct dect_phy_mac_client_association_data {
 
 	struct dect_phy_mac_nbr_info_list_item *target_nbr;
 	struct k_work_delayable association_resp_wait_work;
-	int32_t assigned_slot; /* -1 = none */
 };
 static struct dect_phy_mac_client_data {
 	uint16_t client_seq_nbr;
@@ -59,6 +58,14 @@ static struct dect_phy_mac_client_data {
 	.client_seq_nbr = 0,
 	.last_tx_time_mdm_ticks = 0,
 };
+
+
+static struct {
+    bool    valid;
+    uint8_t assigned_slot_start;
+} tdma_client_state;
+
+
 
 /**************************************************************************************************/
 
@@ -117,61 +124,8 @@ static int dect_phy_mac_client_data_pdu_encode(struct dect_phy_mac_rach_tx_param
 
 	data_sdu_list_item->mux_header = mux_header1;
 	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_DATA_SDU;
-	/* Copy user JSON/text payload first */
 	memcpy(data_sdu_list_item->message.data_sdu.data, params->tx_data_str, dlc_payload_len);
-
-	/* Append a filler payload to increase message size for testing, but cap it
-	 * according to what the selected MCS supports (avoid unsupported slot/MCS
-	 * combinations). Compute maximum bytes available for the largest supported
-	 * slot count for this MCS and cap filler so the encoded PDU won't exceed it.
-	 */
-	size_t remaining = DECT_DATA_MAX_LEN - dlc_payload_len;
-	if (remaining > 0) {
-		/* Determine maximum bytes for the largest slot count supported by
-		 * the PHY. The utils table supports up to 8 slots (0..7). Use slot
-		 * index 7 as the maximum number of slots here.
-		 */
-		const uint8_t MAX_SLOTS_INDEX = 7; /* corresponds to 8 slots */
-		int max_bytes_for_mcs = dect_common_utils_slots_in_bytes(MAX_SLOTS_INDEX, header.df_mcs);
-		size_t filler = 0;
-
-		if (max_bytes_for_mcs > 0) {
-			/* Allow encoded PDU up to max_bytes_for_mcs. Current encoded bytes
-			 * without filler is dlc_payload_len plus headers which will be
-			 * accounted for later; conservatively assume payload-only here and
-			 * cap filler so payload + filler <= max_bytes_for_mcs.
-			 */
-			if ((size_t)max_bytes_for_mcs > dlc_payload_len) {
-				filler = (size_t)max_bytes_for_mcs - dlc_payload_len;
-			} else {
-				filler = 0;
-			}
-		} else {
-			/* If MCS/slot combo unsupported even for smallest payload, don't add filler */
-			filler = 0;
-		}
-
-		/* Also limit to remaining buffer space */
-		if (filler > remaining) {
-			desh_warn("(%s): Requested filler %u reduced to remaining buffer %u",
-					  __func__, (unsigned int)filler, (unsigned int)remaining);
-			filler = remaining;
-		}
-
-		if (filler > 0) {
-			dect_common_utils_fill_with_repeating_pattern(
-				&data_sdu_list_item->message.data_sdu.data[dlc_payload_len], filler);
-			data_sdu_list_item->message.data_sdu.data_length = dlc_payload_len + (uint16_t)filler;
-			if (filler < remaining) {
-				desh_warn("(%s): Truncating filler to %u bytes to match MCS-%d slot limits",
-						  __func__, (unsigned int)filler, header.df_mcs);
-			}
-		} else {
-			data_sdu_list_item->message.data_sdu.data_length = dlc_payload_len;
-		}
-	} else {
-		data_sdu_list_item->message.data_sdu.data_length = dlc_payload_len;
-	}
+	data_sdu_list_item->message.data_sdu.data_length = dlc_payload_len;
 	data_sdu_list_item->message.data_sdu.dlc_ie_type =
 		DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING;
 
@@ -182,42 +136,19 @@ static int dect_phy_mac_client_data_pdu_encode(struct dect_phy_mac_rach_tx_param
 	/* Length so far  */
 	uint16_t encoded_pdu_length = pdu_ptr - *target_ptr;
 
-	/* Determine a supported packet length (0..7 => 1..8 slots) for the
-	 * requested MCS that can contain the encoded PDU. If no packet length
-	 * fits, try lowering the MCS until a supported combination is found.
-	 */
-	int chosen_pkt_len = -1;
-	int chosen_mcs = header.df_mcs;
-	int16_t total_byte_count = 0;
-
-	for (int try_mcs = header.df_mcs; try_mcs >= 0 && chosen_pkt_len < 0; try_mcs--) {
-		for (int pkt_len = 0; pkt_len <= 7; pkt_len++) {
-			int16_t tc = dect_common_utils_slots_in_bytes(pkt_len, try_mcs);
-			if (tc <= 0) {
-				continue;
-			}
-			if ((int)tc >= encoded_pdu_length) {
-				chosen_pkt_len = pkt_len;
-				chosen_mcs = try_mcs;
-				total_byte_count = tc;
-				break;
-			}
-		}
+	header.packet_length = dect_common_utils_phy_packet_length_calculate(
+		encoded_pdu_length, header.packet_length_type, header.df_mcs);
+	if (header.packet_length < 0) {
+		desh_error("(%s): Phy pkt len calculation failed", (__func__));
+		return -EINVAL;
 	}
+	int16_t total_byte_count =
+		dect_common_utils_slots_in_bytes(header.packet_length, header.df_mcs);
 
-	if (chosen_pkt_len < 0) {
+	if (total_byte_count <= 0) {
 		desh_error("Unsupported slot/mcs combination");
 		return -EINVAL;
 	}
-
-	if (chosen_mcs != header.df_mcs) {
-		desh_warn("(%s): lowering MCS from %d to %d to fit payload",
-				  __func__, header.df_mcs, chosen_mcs);
-		header.df_mcs = chosen_mcs;
-	}
-
-	header.packet_length = chosen_pkt_len;
-
 	/* Fill padding if needed */
 	int16_t padding_need = total_byte_count - encoded_pdu_length;
 
@@ -236,7 +167,122 @@ static int dect_phy_mac_client_data_pdu_encode(struct dect_phy_mac_rach_tx_param
 	return header.packet_length;
 }
 
-static struct dect_phy_mac_client_association_data *dect_phy_mac_client_association_data_get(uint32_t long_rd_id);
+static int dect_phy_mac_client_tdma_schedule_tx(
+    struct dect_phy_mac_client_association_data *association_data)
+{
+    if (!tdma_client_state.valid || association_data == NULL ||
+        association_data->target_nbr == NULL) {
+        return -EINVAL;
+    }
+
+    struct dect_phy_mac_nbr_info_list_item *target_nbr = association_data->target_nbr;
+    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+
+    /* Map logical slot index into (frame_offset, slot_in_frame) */
+    uint8_t frame_offset  = tdma_client_state.assigned_slot_start / 10;
+    uint8_t slot_in_frame = tdma_client_state.assigned_slot_start % 10;
+
+    /* Find next beacon frame start in modem time (similar to RACH helper) */
+    uint64_t time_now       = dect_app_modem_time_now();
+    uint64_t latency        = dect_phy_ctrl_modem_latency_for_next_op_get(true);
+    uint64_t first_possible = time_now + latency +
+        US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us);
+
+    int32_t beacon_interval_ms =
+        dect_phy_mac_pdu_cluster_beacon_period_in_ms(
+            target_nbr->beacon_msg.cluster_beacon_period);
+    if (beacon_interval_ms < 0) {
+        return -EINVAL;
+    }
+
+    uint64_t beacon_interval_ticks    = MS_TO_MODEM_TICKS(beacon_interval_ms);
+    uint64_t next_beacon_frame_start  = target_nbr->time_rcvd_mdm_ticks;
+
+    while (next_beacon_frame_start < first_possible) {
+        next_beacon_frame_start += beacon_interval_ticks;
+    }
+
+    uint64_t tx_frame_time = next_beacon_frame_start +
+        (frame_offset * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
+
+    /* Build simple TDMA payload using existing data PDU encoder */
+    struct dect_phy_mac_rach_tx_params rach_params = {
+        .target_long_rd_id = target_nbr->long_rd_id,
+        .get_mdm_temp      = false,
+        .mcs               = current_settings->tx.mcs,
+        .tx_power_dbm      = current_settings->tx.power_dbm,
+        .interval_secs     = 0,
+    };
+
+    snprintf(rach_params.tx_data_str, sizeof(rach_params.tx_data_str),
+             "TDMA seq %u", client_data.client_seq_nbr);
+
+    union nrf_modem_dect_phy_hdr phy_header;
+    uint8_t encoded_data_to_send[DECT_DATA_MAX_LEN];
+    uint8_t *pdu_ptr = encoded_data_to_send;
+
+    memset(encoded_data_to_send, 0, sizeof(encoded_data_to_send));
+
+    int ret = dect_phy_mac_client_data_pdu_encode(&rach_params,
+                    target_nbr->nw_id_24msb,
+                    target_nbr->nw_id_8lsb,
+                    target_nbr->short_rd_id,
+                    &pdu_ptr, &phy_header);
+    if (ret < 0) {
+        desh_error("(%s): Failed to encode TDMA data PDU: %d", __func__, ret);
+        return ret;
+    }
+
+    uint8_t  slot_count         = ret + 1;
+    uint16_t encoded_pdu_length = pdu_ptr - encoded_data_to_send;
+
+    struct dect_phy_api_scheduler_list_item_config *conf;
+    struct dect_phy_api_scheduler_list_item *item =
+        dect_phy_api_scheduler_list_item_alloc_tx_element(&conf);
+    if (!item) {
+        desh_error("(%s): alloc_tx_element failed", __func__);
+        return -ENOMEM;
+    }
+
+    conf->address_info.network_id            = target_nbr->nw_id_32bit;
+    conf->address_info.transmitter_long_rd_id = current_settings->common.transmitter_id;
+    conf->address_info.receiver_long_rd_id    = target_nbr->long_rd_id;
+
+    conf->channel            = target_nbr->channel;
+    conf->frame_time         = tx_frame_time;
+    conf->start_slot         = slot_in_frame;
+    conf->interval_mdm_ticks = beacon_interval_ticks; /* repeat once per beacon period */
+    conf->length_slots       = slot_count;
+    conf->length_subslots    = 0;
+
+    conf->tx.phy_lbt_period            = NRF_MODEM_DECT_LBT_PERIOD_MIN;
+    conf->tx.phy_lbt_rssi_threshold_max = current_settings->rssi_scan.busy_threshold;
+    conf->tx.harq_feedback_requested   = false;
+
+    item->sched_config.tx.encoded_payload_pdu_size = encoded_pdu_length;
+    memcpy(item->sched_config.tx.encoded_payload_pdu, encoded_data_to_send,
+           item->sched_config.tx.encoded_payload_pdu_size);
+
+    item->sched_config.tx.header_type = DECT_PHY_HEADER_TYPE2;
+    memcpy(&item->sched_config.tx.phy_header.type_2, &phy_header.type_2,
+           sizeof(phy_header.type_2));
+
+    item->priority      = DECT_PRIORITY1_TX;
+    item->phy_op_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE; /* define in a header */
+
+    if (!dect_phy_api_scheduler_list_item_add(item)) {
+        desh_error("(%s): scheduler add failed", __func__);
+        dect_phy_api_scheduler_list_item_dealloc(item);
+        return -EBUSY;
+    }
+
+    desh_print("Client TDMA TX scheduled: frame_time %llu, frame_offset %u, slot %u",
+               tx_frame_time, frame_offset, slot_in_frame);
+
+    return 0;
+}
+
+
 
 static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 	struct dect_phy_mac_nbr_info_list_item *target_nbr)
@@ -256,11 +302,6 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 	if (beacon_interval_ms < 0) {
 		return 0;
 	}
-
-	/* Simple TDMA mode: if enabled in settings, schedule client TX into a deterministic
-	 * slot inside the beacon interval. Slot index chosen as `short_rd_id % slot_count`.
-	 * This is a minimal TDMA switch from collision-avoidance to slot-based access.
-	 */
 	bool our_beacon_is_running = dect_phy_mac_cluster_beacon_is_running();
 
 	if (our_beacon_is_running) {
@@ -271,86 +312,6 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 	}
 
 	beacon_interval_mdm_ticks = MS_TO_MODEM_TICKS(beacon_interval_ms);
-
-	if (current_settings->tdma_enabled) {
-		/* Determine number of slots available in a beacon interval (slot granularity)
-		 * and pick a deterministic slot for this client based on short_rd_id.
-		 */
-		uint32_t slot_count = (uint32_t)(beacon_interval_mdm_ticks /
-			DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS);
-		/* Allow overriding slot count from settings */
-		if (current_settings->tdma_slot_count) {
-			slot_count = current_settings->tdma_slot_count;
-		}
-		if (slot_count == 0) {
-			/* Fallback to RA behaviour if interval too short */
-			/* continue to existing RA calculation below */
-		} else {
-			uint32_t slot_index;
-			/* Prefer explicit per-association assigned slot if present */
-			struct dect_phy_mac_client_association_data *assoc_data =
-				dect_phy_mac_client_association_data_get(target_nbr->long_rd_id);
-			if (assoc_data && assoc_data->assigned_slot >= 0) {
-				slot_index = (uint32_t)assoc_data->assigned_slot;
-			} else {
-				slot_index = target_nbr->short_rd_id % slot_count;
-			}
-
-			/* Start at next beacon frame */
-			ra_start_mdm_ticks = next_beacon_frame_start +
-				(uint64_t)slot_index * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
-
-			/* small offset to align RX window (preserve previous 2 subslots delay) */
-			ra_start_mdm_ticks += (2 * DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS);
-
-			/* Log selected slot and timing for debugging */
-			{
-				uint64_t now = dect_app_modem_time_now();
-				if (assoc_data && assoc_data->assigned_slot >= 0) {
-					desh_print("TDMA: assigned slot %u selected for long RD %u; frame_time %lld, now %lld",
-							   slot_index, target_nbr->long_rd_id,
-							   (long long)ra_start_mdm_ticks, (long long)now);
-				} else {
-					desh_print("TDMA: computed slot %u (short_rd_id %u) for long RD %u; frame_time %lld, now %lld",
-							   slot_index, target_nbr->short_rd_id, target_nbr->long_rd_id,
-							   (long long)ra_start_mdm_ticks, (long long)now);
-				}
-			}
-
-			/* Avoid collisions with our own beacon */
-			uint64_t next_our_beacon_frame_time = 0;
-			if (dect_phy_mac_cluster_beacon_is_running()) {
-				next_our_beacon_frame_time =
-					dect_phy_mac_cluster_beacon_last_tx_frame_time_get();
-				uint32_t our_beacon_interval_mdm_ticks =
-					MS_TO_MODEM_TICKS(DECT_PHY_MAC_CLUSTER_BEACON_INTERVAL_MS);
-
-				while (next_our_beacon_frame_time < ra_start_mdm_ticks) {
-					next_our_beacon_frame_time += our_beacon_interval_mdm_ticks;
-				}
-				if (next_our_beacon_frame_time &&
-					dect_common_utils_mdm_ticks_is_in_range(
-						ra_start_mdm_ticks,
-						next_our_beacon_frame_time,
-						next_our_beacon_frame_time + (DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS / 2))) {
-					/* move to next slot */
-					ra_start_mdm_ticks += DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
-				}
-			}
-
-			/* Make sure TX is after modem latency/first possible tx */
-			while (ra_start_mdm_ticks < first_possible_tx) {
-				ra_start_mdm_ticks += DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
-			}
-
-			/* If ra_start is beyond validity window, fall back to RA behaviour below */
-			if (ra_start_mdm_ticks > (next_beacon_frame_start + beacon_interval_mdm_ticks)) {
-				/* let existing RA calculation determine a safe TX */
-			} else {
-				return ra_start_mdm_ticks;
-			}
-		}
-	}
 
 	/* We are sending after next beacon and ...  */
 	next_beacon_frame_start = beacon_received;
@@ -459,7 +420,6 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 	}
 
 	/* Get fresh nbr info */
-	
 	struct dect_phy_mac_nbr_info_list_item *scan_info =
 		dect_phy_mac_nbr_info_get_by_long_rd_id(cmd_params.target_long_rd_id);
 
@@ -532,22 +492,6 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	if (ra_start_mdm_ticks == 0) {
 		desh_error("(%s): Failed to get next RACH TX time", __func__);
 		return -EINVAL;
-	}
-
-	/* Log transmit intention for debugging */
-	{
-		uint64_t now = dect_app_modem_time_now();
-		struct dect_phy_mac_client_association_data *assoc =
-			dect_phy_mac_client_association_data_get(params->target_long_rd_id);
-		if (assoc && assoc->assigned_slot >= 0) {
-			desh_print("TDMA_TX: Transmitting to long RD %u on assigned slot %d at time %lld (now %lld)",
-					   params->target_long_rd_id, assoc->assigned_slot,
-					   (long long)ra_start_mdm_ticks, (long long)now);
-		} else {
-			desh_print("TDMA_TX: Transmitting to long RD %u (no assigned slot) at time %lld (now %lld)",
-					   params->target_long_rd_id, (long long)ra_start_mdm_ticks,
-					   (long long)now);
-		}
 	}
 
 	struct dect_phy_api_scheduler_list_item_config *sched_list_item_conf;
@@ -761,22 +705,6 @@ static int dect_phy_mac_client_associate_msg_send(
 		return -EINVAL;
 	}
 
-	/* Log association TX scheduling for debugging */
-	{
-		uint64_t now = dect_app_modem_time_now();
-		struct dect_phy_mac_client_association_data *assoc =
-			dect_phy_mac_client_association_data_get(params->target_long_rd_id);
-		if (assoc && assoc->assigned_slot >= 0) {
-			desh_print("TDMA_ASSOC: Sending assoc req to long RD %u on assigned slot %d at %lld (now %lld)",
-					   params->target_long_rd_id, assoc->assigned_slot,
-					   (long long)ra_start_mdm_ticks, (long long)now);
-		} else {
-			desh_print("TDMA_ASSOC: Sending assoc req to long RD %u (no assigned slot) at %lld (now %lld)",
-					   params->target_long_rd_id, (long long)ra_start_mdm_ticks,
-					   (long long)now);
-		}
-	}
-
 	struct dect_phy_api_scheduler_list_item_config *sched_list_item_conf;
 	struct dect_phy_api_scheduler_list_item *sched_list_item =
 		dect_phy_api_scheduler_list_item_alloc_tx_element(&sched_list_item_conf);
@@ -913,7 +841,6 @@ static void dect_phy_mac_client_association_data_init(void)
 			DECT_PHY_MAC_CLIENT_ASSOCIATED_BG_SCAN + i;
 		client_data.associations[i].target_nbr = NULL;
 		client_data.associations[i].bg_scan_ongoing = false;
-		client_data.associations[i].assigned_slot = -1;
 	}
 }
 
@@ -976,8 +903,6 @@ int dect_phy_mac_client_associate(struct dect_phy_mac_nbr_info_list_item *target
 	association_data->state = DECT_PHY_MAC_CLIENT_ASSOCIATION_STATE_WAITING_ASSOCIATION_RESP;
 	association_data->target_long_rd_id = params->target_long_rd_id;
 	association_data->target_nbr = target_nbr;
-	/* store explicit slot assignment if provided */
-	association_data->assigned_slot = params->assigned_slot;
 
 	k_work_init_delayable(
 		&association_data->association_resp_wait_work,
@@ -1017,48 +942,53 @@ void dect_phy_mac_client_nbr_scan_completed_cb(
 }
 
 void dect_phy_mac_client_associate_resp_handle(
-	dect_phy_mac_common_header_t *common_header,
-	dect_phy_mac_association_resp_t *association_resp)
+    dect_phy_mac_common_header_t *common_header,
+    dect_phy_mac_association_resp_t *association_resp)
 {
-	struct dect_phy_mac_client_association_data *association_data =
-		dect_phy_mac_client_association_data_get(common_header->transmitter_id);
+    struct dect_phy_mac_client_association_data *association_data =
+        dect_phy_mac_client_association_data_get(common_header->transmitter_id);
 
-	if (!association_data) {
-		desh_warn("(%s): No association data found for transmitter id %u",
-			(__func__), common_header->transmitter_id);
-		return;
-	}
-	k_work_cancel_delayable(&association_data->association_resp_wait_work);
+    if (!association_data) {
+        desh_warn("(%s): No association data found for transmitter id %u",
+                  __func__, common_header->transmitter_id);
+        return;
+    }
 
-	/* Store assigned slot if provided by central node */
-	association_data->state =  DECT_PHY_MAC_CLIENT_ASSOCIATION_STATE_ASSOCIATED;
-	association_data->assigned_slot = association_resp->assigned_slot;
-	if (association_resp->assigned_slot >= 0) {
-		desh_print("TDMA_CLIENT: Associated with %u; assigned_slot=%d",
-			common_header->transmitter_id, association_resp->assigned_slot);
-	} else {
-		desh_print("TDMA_CLIENT: Associated with %u; no assigned_slot provided",
-			common_header->transmitter_id);
-	}
+    k_work_cancel_delayable(&association_data->association_resp_wait_work);
 
-	struct dect_phy_mac_nbr_bg_scan_params bg_scan_params;
+    association_data->state = DECT_PHY_MAC_CLIENT_ASSOCIATION_STATE_ASSOCIATED;
+    desh_print("(%s): associated with device %d - starting background scan",
+               __func__, common_header->transmitter_id);
 
-	bg_scan_params.cb_op_completed = dect_phy_mac_client_nbr_scan_completed_cb;
-	bg_scan_params.target_nbr = association_data->target_nbr;
-	bg_scan_params.target_long_rd_id = association_data->target_long_rd_id;
-	bg_scan_params.phy_op_handle = association_data->bg_scan_phy_handle;
+    /* Store assigned slot from association response */
+    tdma_client_state.assigned_slot_start = association_resp->assigned_slot_start;
+    tdma_client_state.valid               = (association_resp->ack_bit == 1);
 
-	if (association_data->bg_scan_ongoing) {
-		dect_phy_mac_nbr_bg_scan_stop(association_data->bg_scan_phy_handle);
-	}
+    /* Schedule TDMA TX if we got a slot */
+    if (tdma_client_state.valid) {
+        int err = dect_phy_mac_client_tdma_schedule_tx(association_data);
+        if (err) {
+            desh_warn("(%s): TDMA schedule failed: %d", __func__, err);
+        }
+    }
 
-	if (dect_phy_mac_nbr_bg_scan_start(&bg_scan_params)) {
-		desh_warn("(%s): dect_phy_mac_nbr_bg_scan_start failed", (__func__));
-	} else {
-		association_data->bg_scan_ongoing = true;
-	}
+    /* Existing background scan logic (keep as you have it) */
+    struct dect_phy_mac_nbr_bg_scan_params bg_scan_params;
+    bg_scan_params.cb_op_completed   = dect_phy_mac_client_nbr_scan_completed_cb;
+    bg_scan_params.target_nbr        = association_data->target_nbr;
+    bg_scan_params.target_long_rd_id = association_data->target_long_rd_id;
+    bg_scan_params.phy_op_handle     = association_data->bg_scan_phy_handle;
+
+    if (association_data->bg_scan_ongoing) {
+        dect_phy_mac_nbr_bg_scan_stop(association_data->bg_scan_phy_handle);
+    }
+
+    if (dect_phy_mac_nbr_bg_scan_start(&bg_scan_params)) {
+        desh_warn("(%s): dect_phy_mac_nbr_bg_scan_start failed", __func__);
+    } else {
+        association_data->bg_scan_ongoing = true;
+    }
 }
-
 /**************************************************************************************************/
 
 static int dect_phy_mac_client_association_rel_pdu_encode(
@@ -1154,6 +1084,8 @@ static int dect_phy_mac_client_association_rel_pdu_encode(
 	return header.packet_length;
 }
 
+
+
 static int dect_phy_mac_client_dissociate_msg_send(
 	struct dect_phy_mac_nbr_info_list_item *target_nbr,
 	struct dect_phy_mac_associate_params *params)
@@ -1188,22 +1120,6 @@ static int dect_phy_mac_client_dissociate_msg_send(
 	if (ra_start_mdm_ticks == 0) {
 		desh_error("(%s): Failed to get next RACH TX time", __func__);
 		return -EINVAL;
-	}
-
-	/* Log dissociation TX scheduling for debugging */
-	{
-		uint64_t now = dect_app_modem_time_now();
-		struct dect_phy_mac_client_association_data *assoc =
-			dect_phy_mac_client_association_data_get(params->target_long_rd_id);
-		if (assoc && assoc->assigned_slot >= 0) {
-			desh_print("TDMA_DISSOC: Sending dissoc to long RD %u on assigned slot %d at %lld (now %lld)",
-					   params->target_long_rd_id, assoc->assigned_slot,
-					   (long long)ra_start_mdm_ticks, (long long)now);
-		} else {
-			desh_print("TDMA_DISSOC: Sending dissoc to long RD %u (no assigned slot) at %lld (now %lld)",
-					   params->target_long_rd_id, (long long)ra_start_mdm_ticks,
-					   (long long)now);
-		}
 	}
 
 	struct dect_phy_api_scheduler_list_item_config *sched_list_item_conf;

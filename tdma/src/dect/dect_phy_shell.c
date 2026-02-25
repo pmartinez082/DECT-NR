@@ -1510,8 +1510,6 @@ enum {
 	DECT_SHELL_SETT_COMMON_RX_EXP_RSSI_LEVEL,
 	DECT_SHELL_SETT_COMMON_TX_PWR,
 	DECT_SHELL_SETT_COMMON_TX_MCS,
-	DECT_SHELL_SETT_TDMA_ENABLE,
-	DECT_SHELL_SETT_TDMA_SLOT_COUNT,
 	DECT_SHELL_SETT_RESET_ALL,
 };
 
@@ -1610,8 +1608,6 @@ static struct option long_options_settings[] = {
 	 DECT_SHELL_SETT_COMMON_RSSI_SCAN_BUSY_THRESHOLD},
 	{"rssi_scan_suitable_percent", required_argument, 0,
 	 DECT_SHELL_SETT_COMMON_RSSI_SCAN_SUITABLE_PERCENT},
-	{"tdma_enable", required_argument, 0, DECT_SHELL_SETT_TDMA_ENABLE},
-	{"tdma_slot_count", required_argument, 0, DECT_SHELL_SETT_TDMA_SLOT_COUNT},
 	{"reset", no_argument, 0, DECT_SHELL_SETT_RESET_ALL},
 	{"read", no_argument, 0, 'r'},
 	{0, 0, 0, 0}};
@@ -1656,11 +1652,6 @@ static void dect_phy_sett_cmd_print(struct dect_phy_settings *dect_sett)
 	desh_print("Scheduler common settings:");
 	desh_print("  scheduling offset/delay (us).............................%d",
 		   dect_sett->scheduler.scheduling_delay_us);
-	    desh_print("TDMA settings:");
-	    desh_print("  TDMA enabled.............................................%s",
-		    dect_sett->tdma_enabled ? "Yes" : "No");
-	    desh_print("  TDMA slot count (0=auto).................................%u",
-		    dect_sett->tdma_slot_count);
 	desh_print("Common HARQ settings:");
 	desh_print("  Modem init HARQ process count............................%d",
 		   dect_sett->harq.mdm_init_harq_process_count);
@@ -1839,26 +1830,6 @@ static int dect_phy_sett_cmd(const struct shell *shell, size_t argc, char **argv
 			}
 			newsettings.rssi_scan.type_subslots_params.scan_suitable_percent =
 				tmp_value;
-			break;
-		}
-		case DECT_SHELL_SETT_TDMA_ENABLE: {
-			if (!strcmp(optarg, "1") || !strcmp(optarg, "true") || !strcmp(optarg, "on")) {
-				newsettings.tdma_enabled = true;
-			} else if (!strcmp(optarg, "0") || !strcmp(optarg, "false") || !strcmp(optarg, "off")) {
-				newsettings.tdma_enabled = false;
-			} else {
-				desh_error("Invalid tdma_enable value. Use 1/0 or true/false");
-				goto show_usage;
-			}
-			break;
-		}
-		case DECT_SHELL_SETT_TDMA_SLOT_COUNT: {
-			tmp_value = atoi(optarg);
-			if (tmp_value < 0) {
-				desh_error("Invalid tdma_slot_count value");
-				goto show_usage;
-			}
-			newsettings.tdma_slot_count = (uint32_t)tmp_value;
 			break;
 		}
 		case DECT_SHELL_SETT_RESET_ALL: {

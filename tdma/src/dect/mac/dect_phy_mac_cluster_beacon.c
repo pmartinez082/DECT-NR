@@ -30,7 +30,21 @@
 #include "dect_phy_mac_pdu.h"
 #include "dect_phy_mac_ctrl.h"
 
-static struct dect_phy_mac_cluster_beacon_data {
+/* TDMA slot bookkeeping for associated clients */
+#define MAX_SLOTS 256  /* number of logical TDMA slots */
+#define SLOT_FREE 0
+#define SLOT_RESERVED 1
+
+struct dect_phy_mac_slot_map {
+	uint8_t slots[MAX_SLOTS]; /* 0 = free, 1 = reserved */
+};
+
+struct dect_phy_mac_client_info associated_clients[MAX_CLIENTS];
+uint8_t associated_clients_count = 0;
+struct dect_phy_mac_slot_map global_slot_map;
+
+/* Beacon state shared with TDMA scheduler */
+struct dect_phy_mac_cluster_beacon_data {
 	bool running;
 
 	uint8_t next_sfn;
@@ -43,7 +57,144 @@ static struct dect_phy_mac_cluster_beacon_data {
 	uint64_t last_tx_frame_time;
 
 	struct dect_phy_mac_beacon_start_params start_params;
-} beacon_data;
+};
+
+static struct dect_phy_mac_cluster_beacon_data beacon_data;
+
+/*----------------------------------------------------------------------------*/
+/* Simple slot allocator for TDMA clients (central side) */
+
+static int find_free_slots(uint8_t needed_slots)
+{
+	int start = -1;
+	int count = 0;
+
+	for (int i = 0; i < MAX_SLOTS; i++) {
+		if (global_slot_map.slots[i] == SLOT_FREE) {
+			if (start == -1) {
+				start = i;
+			}
+			count++;
+			if (count == needed_slots) {
+				return start;
+			}
+		} else {
+			start = -1;
+			count = 0;
+		}
+	}
+
+	return -1;
+}
+
+static int dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client)
+{
+	if (client == NULL || client->num_slots_needed == 0U) {
+		return -1;
+	}
+
+	int slot_start = find_free_slots(client->num_slots_needed);
+
+	if (slot_start < 0) {
+		desh_error("No free slots available for client %u", client->client_id);
+		return -1;
+	}
+
+	for (int i = 0; i < client->num_slots_needed; i++) {
+		global_slot_map.slots[slot_start + i] = SLOT_RESERVED;
+	}
+
+	client->assigned_slot_start = slot_start;
+	desh_print("Assigned client %u slots [%d .. %d]",
+		   client->client_id, slot_start,
+		   slot_start + client->num_slots_needed - 1);
+
+	return 0;
+}
+
+static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
+{
+	if (client == NULL || client->assigned_slot_start == 0xFFU) {
+		return;
+	}
+
+	for (int i = 0; i < client->num_slots_needed; i++) {
+		global_slot_map.slots[client->assigned_slot_start + i] = SLOT_FREE;
+	}
+
+	desh_print("Freed client %u slots [%d .. %d]",
+		   client->client_id, client->assigned_slot_start,
+		   client->assigned_slot_start + client->num_slots_needed - 1);
+
+	client->assigned_slot_start = 0xFF;
+}
+
+
+/*----------------------------------------------------------------------------*/
+/* Server-side TDMA scheduling: unicast per associated client */
+
+static void cluster_schedule_tdma(uint64_t superframe_start_time)
+{
+	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
+	uint32_t op_handle_base = 5000;
+
+	for (int c = 0; c < associated_clients_count; c++) {
+		struct dect_phy_mac_client_info *client = &associated_clients[c];
+
+		if (client->assigned_slot_start == 0xFFU) {
+			continue;
+		}
+
+		/* 10 slots per DECT radio frame */
+		uint8_t frame_offset = client->assigned_slot_start / 10U;
+		uint8_t slot_in_frame = client->assigned_slot_start % 10U;
+
+		uint64_t tx_frame_time = superframe_start_time +
+			(frame_offset * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
+
+		struct dect_phy_api_scheduler_list_item_config *conf;
+		struct dect_phy_api_scheduler_list_item *item =
+			dect_phy_api_scheduler_list_item_alloc_tx_element(&conf);
+
+		if (!item) {
+			desh_error("TDMA alloc failed for client %u", client->client_id);
+			continue;
+		}
+
+		conf->channel = beacon_data.start_params.beacon_channel;
+		conf->frame_time = tx_frame_time;
+		conf->start_slot = slot_in_frame;
+		conf->length_slots = client->num_slots_needed;
+		conf->length_subslots = 0;
+		conf->interval_mdm_ticks = 0; /* one-shot; re-scheduled each beacon */
+
+		conf->address_info.network_id = current_settings->common.network_id;
+		conf->address_info.transmitter_long_rd_id = current_settings->common.transmitter_id;
+		conf->address_info.receiver_long_rd_id = client->client_id;
+
+		item->priority = DECT_PRIORITY1_TX;
+		item->phy_op_handle = op_handle_base + (uint32_t)c;
+
+		if (!dect_phy_api_scheduler_list_item_add(item)) {
+			desh_error("TDMA schedule failed for client %u", client->client_id);
+			dect_phy_api_scheduler_list_item_dealloc(item);
+		} else {
+			desh_print("Scheduled Client %u at Frame +%u, Slot %u",
+				   client->client_id, frame_offset, slot_in_frame);
+		}
+	}
+}
+
+/* Work item to defer TDMA scheduling out of ISR context */
+static void tdma_schedule_work_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	/* Use last recorded beacon TX time as superframe start */
+	cluster_schedule_tdma(beacon_data.last_tx_frame_time);
+}
+
+static struct k_work tdma_schedule_work;
 
 struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 	int8_t busy_rssi_limit;
@@ -56,6 +207,20 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 	enum dect_phy_rssi_scan_data_result_verdict
 		scan_result_symbols_in_frame[DECT_RADIO_FRAME_SYMBOL_COUNT];
 } lms_rssi_scan_data;
+
+/* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
+ * resources. Scheduling a large validity window (e.g., 100 frames) can result
+ * in dozens of RX ops being allocated which may exceed modem capacity.
+ */
+#define MAX_RACH_RX_ITEMS 16
+
+
+// Hardcoded for now
+static struct dect_phy_mac_cluster_tdma_client_cfg client1_cfg = {
+    .start_frame = 2,
+    .packets_per_superframe = 10,
+    .slots_per_packet = 4,
+};
 
 static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void);
 
@@ -274,18 +439,35 @@ void dect_phy_mac_ctrl_cluster_beacon_phy_api_direct_rssi_cb(
 }
 
 static void dect_phy_mac_cluster_beacon_to_mdm_cb(
-	struct dect_phy_common_op_completed_params *params, uint64_t frame_time)
+    struct dect_phy_common_op_completed_params *params, uint64_t frame_time)
 {
 	if (params->status == NRF_MODEM_DECT_PHY_SUCCESS) {
 		beacon_data.last_tx_frame_time = frame_time;
+
+		/* Print current frame_time */
+		printk("Beacon TX callback fired: frame_time=%llu\n", frame_time);
+
+		/* TDMA scheduling temporarily disabled to avoid ISR mutex use.
+		 * It can be re‑enabled by submitting tdma_schedule_work from
+		 * thread context instead of this modem callback.
+		 */
 	}
 }
-
 uint64_t dect_phy_mac_cluster_beacon_last_tx_frame_time_get(void)
 {
 	return beacon_data.last_tx_frame_time;
 }
 
+   void tdma_init(void)
+   {
+       memset(&global_slot_map, 0, sizeof(global_slot_map));
+       for (int i = 0; i < MAX_CLIENTS; i++) {
+           associated_clients[i].assigned_slot_start = 0xFF;
+       }
+       associated_clients_count = 0;
+   }
+
+// Superframe!!
 int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params *params)
 {
 
@@ -304,6 +486,9 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 	memset(encoded_beacon_pdu, 0, DECT_DATA_MAX_LEN);
 	memset(&beacon_data, 0, sizeof(struct dect_phy_mac_cluster_beacon_data));
 
+	/* Init TDMA scheduling work item */
+	k_work_init(&tdma_schedule_work, tdma_schedule_work_handler);
+
 	/* Encode cluster beacon */
 	ret = dect_phy_mac_cluster_beacon_encode(params, &pdu_ptr, &phy_header);
 	if (ret < 0) {
@@ -312,9 +497,9 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 	}
 	slot_count = ret + 1;
 	beacon_data.start_params = *params;
-
+	tdma_init();
 	dect_phy_mac_ctrl_lms_rssi_scan_data_init(slot_count);
-
+	
 	/* Schedule beaconing */
 	uint64_t first_possible_tx;
 	uint64_t time_now = dect_app_modem_time_now();
@@ -432,6 +617,12 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 				   DECT_PHY_MAC_CLUSTER_BEACON_RA_VALIDITY);
 
 	while (rach_frame_time <= last_valid_rach_rx_frame_time) {
+		static int rach_items_count = 0;
+
+		if (rach_items_count >= MAX_RACH_RX_ITEMS) {
+			/* Stop adding more RX items to avoid exhausting modem resources */
+			break;
+		}
 		struct dect_phy_api_scheduler_list_item_config *rach_list_item_conf;
 		struct dect_phy_api_scheduler_list_item *rach_list_item =
 			dect_phy_api_scheduler_list_item_alloc_rx_element(&rach_list_item_conf);
@@ -451,7 +642,11 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		rach_list_item_conf->length_slots = DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS;
 		rach_list_item_conf->length_subslots = 0;
 
-		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS;
+		/* Use single-shot RX for RACH to avoid allocating long-running modem RX
+		 * resources which can result in NRF_MODEM_DECT_PHY_ERR_NO_MEMORY. The
+		 * scheduler will repeat the RX per interval as configured.
+		 */
+		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_SINGLE_SHOT;
 		rach_list_item_conf->rx.expected_rssi_level =
 			current_settings->rx.expected_rssi_level;
 		rach_list_item_conf->rx.duration =
@@ -479,6 +674,7 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		rach_frame_time = rach_frame_time + (DECT_PHY_MAC_CLUSTER_BEACON_RA_REPETITION *
 						     DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
 		rach_handle++;
+		rach_items_count++;
 		if (rach_handle > DECT_PHY_MAC_BEACON_RX_RACH_HANDLE_END) {
 			rach_handle = DECT_PHY_MAC_BEACON_RX_RACH_HANDLE_START;
 		}
@@ -546,7 +742,8 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 	struct dect_phy_commmon_op_pdc_rcv_params *rcv_params,
 	dect_phy_mac_common_header_t *common_header,
 	dect_phy_mac_association_req_t *association_req, uint8_t **target_ptr, /* In/Out */
-	union nrf_modem_dect_phy_hdr *out_phy_header)
+	union nrf_modem_dect_phy_hdr *out_phy_header,
+	uint8_t assigned_slot)
 {
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 	struct dect_phy_header_type2_format1_t header = {
@@ -588,8 +785,7 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 	if (data_sdu_list_item == NULL) {
 		return -ENOMEM;
 	}
-	/* We include assigned_slot (2 bytes) in the association response when ack'ing */
-	uint16_t payload_data_len = DECT_PHY_MAC_ASSOCIATION_RESP_MIN_LEN + 2;
+	uint16_t payload_data_len = DECT_PHY_MAC_ASSOCIATION_RESP_MIN_LEN;
 	dect_phy_mac_mux_header_t mux_header1 = {
 		.mac_ext = DECT_PHY_MAC_EXT_8BIT_LEN,
 		.ie_type = DECT_PHY_MAC_IE_TYPE_ASSOCIATION_RESP,
@@ -598,38 +794,14 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 
 	/* Encode association response: we are dummy beacon and accepting everything  */
 	dect_phy_mac_association_resp_t association_resp = {
-		.ack_bit = 1,
+		.ack_bit = (assigned_slot != 0xFF) ? 1 : 0, /* ACK if we assigned a slot, NACK otherwise */
 		.group_bit = 0,
 		.harq_conf_bit = 0, /* HARQ config accepted as in a request */
 		.flow_count = 7,    /* 0b111: all flows accepted as in request */
-		.assigned_slot = -1,
+		.assigned_slot_start = assigned_slot, /* Inform client of the assigned slot (0xFF if no slot assigned) */
+		
 	};
-
-	/* Assign a TDMA slot for this client (central allocation). Use beacon period to
-	 * compute slot_count and allocate round-robin. If slot_count==0 then leave -1.
-	 */
-	{
-		static int next_tdma_slot = 0;
-		struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-		int32_t beacon_interval_ms = dect_phy_mac_pdu_cluster_beacon_period_in_ms(
-			association_req->cluster_beacon_period);
-		if (beacon_interval_ms >= 0) {
-			uint64_t beacon_interval_mdm_ticks = MS_TO_MODEM_TICKS(beacon_interval_ms);
-			uint32_t slot_count = (uint32_t)(beacon_interval_mdm_ticks /
-											 DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS);
-			if (current_settings->tdma_slot_count) {
-				slot_count = current_settings->tdma_slot_count;
-			}
-			if (slot_count > 0) {
-				association_resp.assigned_slot = next_tdma_slot % slot_count;
-				next_tdma_slot = (next_tdma_slot + 1) % slot_count;
-				desh_print("TDMA_ASSIGN: Assigned slot %d to requester long RD %u (slot_count=%u)",
-						   association_resp.assigned_slot, common_header->transmitter_id,
-						   slot_count);
-			}
-		}
-	}
-
+	/* TODO: The client needs to know the assigned slot  */
 	data_sdu_list_item->mux_header = mux_header1;
 	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_ASSOCIATION_RESP;
 	data_sdu_list_item->message.association_resp = association_resp;
@@ -682,6 +854,15 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 		return;
 	}
 
+	struct dect_phy_mac_client_info new_client = {
+        .client_id = common_header->transmitter_id,
+        // For now, we assume 4 slots per packet as per your client1_cfg
+        .num_slots_needed = 4 
+    };
+
+
+
+
 	union nrf_modem_dect_phy_hdr phy_header;
 	int ret;
 	uint8_t slot_count = 0;
@@ -690,12 +871,34 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 
 	memset(encoded_data_to_send2, 0, DECT_DATA_MAX_LEN);
 
-	/* Encode response PDU to be sent */
-	ret = dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
-		rcv_params, common_header, association_req, &pdu_ptr, &phy_header);
-	if (ret < 0) {
-		return;
+
+    int assignment_status = dect_phy_mac_assign_slots(&new_client);
+
+    if (assignment_status == 0 && associated_clients_count < MAX_CLIENTS) {
+        associated_clients[associated_clients_count] = new_client;
+        associated_clients_count++;
+    }
+
+    uint8_t encoded_resp_pdu[DECT_DATA_MAX_LEN];
+
+
+    // Pass the assigned_slot_start to the encoder so it can tell the client
+    ret = dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
+                rcv_params, 
+                common_header, 
+                association_req, 
+                &pdu_ptr, 
+                &phy_header,
+                (assignment_status == 0) ? new_client.assigned_slot_start : 0xFF);
+
+    if (ret < 0) {
+        return;
 	}
+
+	/* Encode response PDU to be sent */
+	/*ret = dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
+		rcv_params, common_header, association_req, &pdu_ptr, &phy_header);*/
+
 	slot_count = ret + 1;
 	uint16_t encoded_pdu_length = pdu_ptr - encoded_data_to_send2;
 
@@ -730,32 +933,7 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 	tx_op.phy_header = &phy_header;
 	tx_op.phy_type = DECT_PHY_HEADER_TYPE2;
 	tx_op.handle = DECT_PHY_MAC_BEACON_RA_RESP_TX_HANDLE;
-	tx_op.start_time = resp_start_time + (DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS * 100);
-
-	/* Ensure start_time is not in the past relative to modem time and scheduler latency.
-	 * If computed start_time is too late (i.e., already past), move it forward to
-	 * allow the modem API to accept the operation. This prevents ERR_OP_START_TIME_LATE.
-	 */
-	{
-		uint64_t now = dect_app_modem_time_now();
-		uint64_t min_start = now + dect_phy_ctrl_modem_latency_for_next_op_get(true) +
-			(US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us));
-		if (tx_op.start_time < min_start) {
-			uint64_t old = tx_op.start_time;
-			/* Use modem-reported minimum margin between ops to ensure we
-			 * schedule far enough in the future for the modem to accept
-			 * the TX operation. This provides a larger, more robust safety
-			 * buffer than a single subslot.
-			 */
-			uint64_t margin = dect_phy_ctrl_modem_latency_min_margin_between_ops_get();
-			if (!margin) {
-				margin = DECT_RADIO_SUBSLOT_DURATION_IN_MODEM_TICKS;
-			}
-			tx_op.start_time = min_start + margin;
-			desh_warn("(%s): Adjusted resp_start_time from %lld to %lld to account for modem latency/scheduling delay",
-				__func__, (long long)old, (long long)tx_op.start_time);
-		}
-	}
+	tx_op.start_time = resp_start_time;
 	ret = nrf_modem_dect_phy_tx(&tx_op);
 	if (ret) {
 		printk("(%s): nrf_modem_dect_phy_tx failed %d (handle %d)\n", (__func__), ret,

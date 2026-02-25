@@ -539,6 +539,11 @@ static uint16_t dect_phy_mac_pdu_sdu_cluster_beacon_length_get(
 	return length;
 }
 
+
+
+
+
+
 bool dect_phy_mac_pdu_sdu_cluster_beacon_decode(const uint8_t *payload_ptr, uint32_t payload_len,
 						dect_phy_mac_cluster_beacon_t *cluster_beacon_out)
 {
@@ -867,12 +872,6 @@ dect_phy_mac_pdu_sdu_association_resp_encode(const dect_phy_mac_association_resp
 			*target_ptr++ = resp_in->group_id & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 			*target_ptr++ = resp_in->resource_tag & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 		}
-
-		/* Encode assigned slot as 16-bit big-endian. -1 means no assignment -> 0xFFFF */
-		{
-			uint16_t slot = (resp_in->assigned_slot < 0) ? 0xFFFF : (uint16_t)resp_in->assigned_slot;
-			target_ptr = dect_common_utils_16bit_be_write(target_ptr, slot);
-		}
 	}
 	return target_ptr;
 }
@@ -886,11 +885,6 @@ static uint16_t dect_phy_mac_pdu_sdu_association_resp_length_get(
 		length += 2;
 	}
 	if (resp->group_bit) {
-		length += 2;
-	}
-
-	/* assigned_slot included when ack present */
-	if (resp->ack_bit) {
 		length += 2;
 	}
 
@@ -936,11 +930,6 @@ bool dect_phy_mac_pdu_sdu_association_resp_decode(const uint8_t *payload_ptr, ui
 	if (resp_out->group_bit) {
 		resp_out->group_id = *payload_ptr++ & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 		resp_out->resource_tag = *payload_ptr++ & DECT_COMMON_UTILS_BIT_MASK_7BIT;
-	}
-
-	/* Read optional assigned slot (16-bit BE) if ack present */
-	if (resp_out->ack_bit) {
-		resp_out->assigned_slot = (int16_t)dect_common_utils_16bit_be_read(&payload_ptr);
 	}
 	return true;
 }

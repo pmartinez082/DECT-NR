@@ -1689,7 +1689,7 @@ int dect_phy_ctrl_ext_command_start(struct dect_phy_ctrl_ext_callbacks ext_callb
 	ctrl_data.ext_cmd = ext_callbacks;
 	ctrl_data.ext_command_running = true;
 	return 0;
-}
+} 
 
 void dect_phy_ctrl_ext_command_stop(void)
 {

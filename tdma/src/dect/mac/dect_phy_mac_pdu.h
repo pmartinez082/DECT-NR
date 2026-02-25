@@ -310,9 +310,8 @@ typedef struct {
 
 	uint8_t group_id;
 	uint8_t resource_tag;
+	uint8_t assigned_slot_start; /* Coded value, 0xFF means no slot assigned */
 
-    /* Optional assigned slot allocated by central node (-1 = none) */
-    int16_t assigned_slot;
 } dect_phy_mac_association_resp_t;
 
 #define DECT_PHY_MAC_ASSOCIATION_REL_LEN (1)

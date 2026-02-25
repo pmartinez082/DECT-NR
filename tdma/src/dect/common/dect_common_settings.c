@@ -64,8 +64,6 @@ static const struct dect_phy_settings phy_settings_data_defaults = {
 	.harq = phy_harq_common_settings,
 	.tx = phy_tx_common_settings,
 	.rx = phy_rx_common_settings,
-	.tdma_enabled = true,
-	.tdma_slot_count = 0,
 };
 static struct dect_phy_settings phy_settings_data = phy_settings_data_defaults;
 
@@ -153,10 +151,6 @@ int dect_common_settings_init(void)
 
 	phy_settings_data.scheduler = phy_scheduler_common_settings;
 	phy_settings_data.rssi_scan = phy_rssi_scan_settings_data;
-
-	/* TDMA defaults */
-	phy_settings_data.tdma_enabled = phy_settings_data_defaults.tdma_enabled;
-	phy_settings_data.tdma_slot_count = phy_settings_data_defaults.tdma_slot_count;
 
 	ret = settings_subsys_init();
 	if (ret) {

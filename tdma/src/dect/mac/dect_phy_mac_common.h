@@ -6,7 +6,7 @@
 
 #ifndef DECT_PHY_MAC_COMMON_H
 #define DECT_PHY_MAC_COMMON_H
-
+#define MAX_CLIENTS 10
 #include <zephyr/kernel.h>
 #include <stdint.h>
 
@@ -43,10 +43,21 @@ struct dect_phy_mac_associate_params {
 	uint32_t target_long_rd_id;
 	uint8_t mcs;
 	int8_t tx_power_dbm;
-	/* Optional explicit TDMA slot assignment. -1 = not assigned (auto). */
-	int32_t assigned_slot;
 };
 
+struct dect_phy_mac_cluster_tdma_client_cfg {
+    uint16_t start_frame;
+    uint8_t  packets_per_superframe;
+    uint8_t  slots_per_packet;
+};
+
+
+
+struct dect_phy_mac_client_info {
+    uint32_t client_id;
+    uint8_t num_slots_needed;
+    uint8_t assigned_slot_start;
+};
 /******************************************************************************/
 
 #endif /* DECT_PHY_MAC_COMMON_H */
