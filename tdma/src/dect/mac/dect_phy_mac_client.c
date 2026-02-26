@@ -407,14 +407,16 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 		char tmp_str[DECT_DATA_MAX_LEN * 2] = {0};
 		int mdm_temperature = dect_phy_ctrl_modem_temperature_get();
 
-		/* Modem temperature to be included in a data JSON */
-		if (mdm_temperature == NRF_MODEM_DECT_PHY_TEMP_NOT_MEASURED) {
-			sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"N/A\"}",
-				cmd_params.tx_data_str);
-		} else {
-			sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\"}",
-				cmd_params.tx_data_str, mdm_temperature);
-		}
+		/* JSON data:
+		beacon frame start slot, assigned slot, client id, tx power, payload len, payload
+		*/
+		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"slot_assign\":\"%d\",\"client_id\":\"%d\",\"tx_pwr\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
+			cmd_params.tx_data_str, mdm_temperature,
+			client_data.client_seq_nbr, tdma_client_state.assigned_slot_start,
+			cmd_params.target_long_rd_id, cmd_params.tx_power_dbm,
+			strlen(cmd_params.tx_data_str), cmd_params.tx_data_str);
+			
+		printk("JSON data:%s\n",tmp_str);
 		memset(cmd_params.tx_data_str, 0, DECT_DATA_MAX_LEN);
 		strncpy(cmd_params.tx_data_str, tmp_str, DECT_DATA_MAX_LEN - 1);
 	}
@@ -959,6 +961,11 @@ void dect_phy_mac_client_associate_resp_handle(
     association_data->state = DECT_PHY_MAC_CLIENT_ASSOCIATION_STATE_ASSOCIATED;
     desh_print("(%s): associated with device %d - starting background scan",
                __func__, common_header->transmitter_id);
+
+	/* Print slot assignment for debugging */
+	printk("Client %u assigned slot %u",
+		   common_header->transmitter_id, association_resp->assigned_slot_start);
+
 
     /* Store assigned slot from association response */
     tdma_client_state.assigned_slot_start = association_resp->assigned_slot_start;

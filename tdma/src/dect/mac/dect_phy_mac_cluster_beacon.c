@@ -11,7 +11,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "desh_print.h"
 
 #include "dect_common.h"
@@ -105,7 +104,7 @@ static int dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client)
 	}
 
 	client->assigned_slot_start = slot_start;
-	desh_print("Assigned client %u slots [%d .. %d]",
+	printk("Assigned client %u slots [%d .. %d]",
 		   client->client_id, slot_start,
 		   slot_start + client->num_slots_needed - 1);
 
@@ -122,7 +121,7 @@ static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
 		global_slot_map.slots[client->assigned_slot_start + i] = SLOT_FREE;
 	}
 
-	desh_print("Freed client %u slots [%d .. %d]",
+	printk("Freed client %u slots [%d .. %d]",
 		   client->client_id, client->assigned_slot_start,
 		   client->assigned_slot_start + client->num_slots_needed - 1);
 
@@ -179,7 +178,7 @@ static void cluster_schedule_tdma(uint64_t superframe_start_time)
 			desh_error("TDMA schedule failed for client %u", client->client_id);
 			dect_phy_api_scheduler_list_item_dealloc(item);
 		} else {
-			desh_print("Scheduled Client %u at Frame +%u, Slot %u",
+			printk("Scheduled Client %u at Frame +%u, Slot %u",
 				   client->client_id, frame_offset, slot_in_frame);
 		}
 	}
@@ -682,7 +681,7 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 
 	beacon_data.running = true;
 
-	desh_print("Scheduled beacon TX: "
+	printk("Scheduled beacon TX: "
 		   "interval %dms, tx pwr %d dbm, channel %d, payload PDU byte count: %d",
 		   DECT_PHY_MAC_CLUSTER_BEACON_INTERVAL_MS, params->tx_power_dbm,
 		   params->beacon_channel, encoded_pdu_length);
@@ -943,16 +942,16 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 
 void dect_phy_mac_cluster_beacon_status_print(void)
 {
-	desh_print("Cluster beacon status:");
-	desh_print("  Beacon running: %s", beacon_data.running ? "yes" : "no");
+	printk("Cluster beacon status:");
+	printk("  Beacon running: %s", beacon_data.running ? "yes" : "no");
 	if (beacon_data.running) {
-		desh_print("  Beacon channel:                %d",
+		printk("  Beacon channel:                %d",
 			   beacon_data.start_params.beacon_channel);
-		desh_print("  Beacon tx power:               %d dBm",
+		printk("  Beacon tx power:               %d dBm",
 			   beacon_data.start_params.tx_power_dbm);
-		desh_print("  Beacon interval:               %d ms",
+		printk("  Beacon interval:               %d ms",
 			   DECT_PHY_MAC_CLUSTER_BEACON_INTERVAL_MS);
-		desh_print("  Beacon payload PDU byte count: %d",
+		printk("  Beacon payload PDU byte count: %d",
 			   beacon_data.encoded_cluster_beacon_pdu_len);
 	}
 }
