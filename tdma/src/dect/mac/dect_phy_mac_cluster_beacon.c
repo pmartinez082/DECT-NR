@@ -86,17 +86,17 @@ static int find_free_slots(uint8_t needed_slots)
 	return -1;
 }
 
-static int dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client)
+static struct dect_phy_mac_client_info *dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client)
 {
 	if (client == NULL || client->num_slots_needed == 0U) {
-		return -1;
+		return NULL;
 	}
 
 	int slot_start = find_free_slots(client->num_slots_needed);
 
 	if (slot_start < 0) {
 		desh_error("No free slots available for client %u", client->client_id);
-		return -1;
+		return NULL;
 	}
 
 	for (int i = 0; i < client->num_slots_needed; i++) {
@@ -107,8 +107,9 @@ static int dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client)
 	printk("Assigned client %u slots [%d .. %d]",
 		   client->client_id, slot_start,
 		   slot_start + client->num_slots_needed - 1);
+	
 
-	return 0;
+	return client;
 }
 
 static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
@@ -742,7 +743,7 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 	dect_phy_mac_common_header_t *common_header,
 	dect_phy_mac_association_req_t *association_req, uint8_t **target_ptr, /* In/Out */
 	union nrf_modem_dect_phy_hdr *out_phy_header,
-	uint8_t assigned_slot)
+	struct dect_phy_mac_client_info *client_info)
 {
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 	struct dect_phy_header_type2_format1_t header = {
@@ -793,11 +794,10 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 
 	/* Encode association response: we are dummy beacon and accepting everything  */
 	dect_phy_mac_association_resp_t association_resp = {
-		.ack_bit = (assigned_slot != 0xFF) ? 1 : 0, /* ACK if we assigned a slot, NACK otherwise */
 		.group_bit = 0,
 		.harq_conf_bit = 0, /* HARQ config accepted as in a request */
 		.flow_count = 7,    /* 0b111: all flows accepted as in request */
-		.assigned_slot_start = assigned_slot, /* Inform client of the assigned slot (0xFF if no slot assigned) */
+		.assigned_slot_start = client_info->assigned_slot_start, /* Inform client of the assigned slot (0xFF if no slot assigned) */
 		
 	};
 	/* TODO: The client needs to know the assigned slot  */
@@ -871,10 +871,10 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 	memset(encoded_data_to_send2, 0, DECT_DATA_MAX_LEN);
 
 
-    int assignment_status = dect_phy_mac_assign_slots(&new_client);
+    struct dect_phy_mac_client_info *assigned_client = dect_phy_mac_assign_slots(&new_client);
 
-    if (assignment_status == 0 && associated_clients_count < MAX_CLIENTS) {
-        associated_clients[associated_clients_count] = new_client;
+    if (assigned_client != NULL && associated_clients_count < MAX_CLIENTS) {
+        associated_clients[associated_clients_count] = *assigned_client;
         associated_clients_count++;
     }
 
@@ -888,7 +888,7 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
                 association_req, 
                 &pdu_ptr, 
                 &phy_header,
-                (assignment_status == 0) ? new_client.assigned_slot_start : 0xFF);
+                assigned_client != NULL ? assigned_client->assigned_slot_start : 0xFF);
 
     if (ret < 0) {
         return;

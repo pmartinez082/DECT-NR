@@ -42,12 +42,11 @@ enum dect_phy_mac_client_association_states {
 struct dect_phy_mac_client_association_data {
 	enum dect_phy_mac_client_association_states state;
 	uint32_t target_long_rd_id;
-
 	uint32_t bg_scan_phy_handle;
 	bool bg_scan_ongoing;
-
 	struct dect_phy_mac_nbr_info_list_item *target_nbr;
 	struct k_work_delayable association_resp_wait_work;
+	int assigned_slot_start /* 0xFF if no slot assigned */;
 };
 static struct dect_phy_mac_client_data {
 	uint16_t client_seq_nbr;
@@ -179,8 +178,8 @@ static int dect_phy_mac_client_tdma_schedule_tx(
     struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 
     /* Map logical slot index into (frame_offset, slot_in_frame) */
-    uint8_t frame_offset  = tdma_client_state.assigned_slot_start / 10;
-    uint8_t slot_in_frame = tdma_client_state.assigned_slot_start % 10;
+	uint8_t frame_offset  =  association_data->assigned_slot_start/ DECT_RADIO_FRAME_SLOT_COUNT;
+	uint8_t slot_in_frame = association_data->assigned_slot_start % DECT_RADIO_FRAME_SLOT_COUNT;
 
     /* Find next beacon frame start in modem time (similar to RACH helper) */
     uint64_t time_now       = dect_app_modem_time_now();
@@ -410,10 +409,9 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 		/* JSON data:
 		beacon frame start slot, assigned slot, client id, tx power, payload len, payload
 		*/
-		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"slot_assign\":\"%d\",\"client_id\":\"%d\",\"tx_pwr\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
+		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"slot_assign\":\"%d\",\"tx_pwr\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
 			cmd_params.tx_data_str, mdm_temperature,
-			client_data.client_seq_nbr, tdma_client_state.assigned_slot_start,
-			cmd_params.target_long_rd_id, cmd_params.tx_power_dbm,
+			client_data.client_seq_nbr, tdma_client_state.assigned_slot_start,cmd_params.tx_power_dbm,
 			strlen(cmd_params.tx_data_str), cmd_params.tx_data_str);
 			
 		printk("JSON data:%s\n",tmp_str);
@@ -507,10 +505,16 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	}
 	uint16_t encoded_pdu_length = pdu_ptr - encoded_data_to_send;
 
-	sched_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
+	/*sched_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
 	sched_list_item_conf->address_info.transmitter_long_rd_id =
 		current_settings->common.transmitter_id;
-	sched_list_item_conf->address_info.receiver_long_rd_id = params->target_long_rd_id;
+	sched_list_item_conf->address_info.receiver_long_rd_id = params->target_long_rd_id;*/
+
+	rach_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
+	rach_list_item_conf->address_info.transmitter_long_rd_id =
+    current_settings->common.transmitter_id;
+	rach_list_item_conf->address_info.receiver_long_rd_id =
+    target_nbr->long_rd_id;
 
 	sched_list_item_conf->cb_op_completed = NULL;
 
@@ -962,6 +966,7 @@ void dect_phy_mac_client_associate_resp_handle(
     desh_print("(%s): associated with device %d - starting background scan",
                __func__, common_header->transmitter_id);
 
+	association_data->assigned_slot_start = association_resp->assigned_slot_start;
 	/* Print slot assignment for debugging */
 	printk("Client %u assigned slot %u",
 		   common_header->transmitter_id, association_resp->assigned_slot_start);

@@ -80,16 +80,3 @@ int dect_phy_mac_assign_slots(struct dect_phy_mac_client_info *client) {
     return 0;
 }
 
-// Free slots when client disconnects
-void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client) {
-    if (!client) return;
-
-    for (int i = 0; i < client->num_slots_needed; i++) {
-        global_slot_map.slots[client->assigned_slot_start + i] = SLOT_FREE;
-    }
-
-    printf("Freed client %u slots [%d .. %d]\n",
-           client->client_id, client->assigned_slot_start,
-           client->assigned_slot_start + client->num_slots_needed - 1);
-    client->assigned_slot_start = 0xFF;
-}

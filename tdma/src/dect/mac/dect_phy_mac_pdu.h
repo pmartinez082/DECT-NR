@@ -384,7 +384,6 @@ typedef struct {
 	sys_dnode_t dnode;
 
 	dect_phy_mac_mux_header_t mux_header;
-
 	dect_phy_mac_message_type_t message_type;
 	dect_phy_mac_message_t message;
 } dect_phy_mac_sdu_t;
