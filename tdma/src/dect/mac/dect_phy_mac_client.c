@@ -409,9 +409,9 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 		/* JSON data:
 		beacon frame start slot, assigned slot, client id, tx power, payload len, payload
 		*/
-		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"slot_assign\":\"%d\",\"tx_pwr\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
+		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
 			cmd_params.tx_data_str, mdm_temperature,
-			client_data.client_seq_nbr, tdma_client_state.assigned_slot_start,cmd_params.tx_power_dbm,
+			client_data.client_seq_nbr,
 			strlen(cmd_params.tx_data_str), cmd_params.tx_data_str);
 			
 		printk("JSON data:%s\n",tmp_str);
@@ -505,16 +505,10 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	}
 	uint16_t encoded_pdu_length = pdu_ptr - encoded_data_to_send;
 
-	/*sched_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
+	sched_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
 	sched_list_item_conf->address_info.transmitter_long_rd_id =
 		current_settings->common.transmitter_id;
-	sched_list_item_conf->address_info.receiver_long_rd_id = params->target_long_rd_id;*/
-
-	rach_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
-	rach_list_item_conf->address_info.transmitter_long_rd_id =
-    current_settings->common.transmitter_id;
-	rach_list_item_conf->address_info.receiver_long_rd_id =
-    target_nbr->long_rd_id;
+	sched_list_item_conf->address_info.receiver_long_rd_id = params->target_long_rd_id;
 
 	sched_list_item_conf->cb_op_completed = NULL;
 

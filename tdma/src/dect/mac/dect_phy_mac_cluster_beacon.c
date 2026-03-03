@@ -145,9 +145,10 @@ static void cluster_schedule_tdma(uint64_t superframe_start_time)
 			continue;
 		}
 
-		/* 10 slots per DECT radio frame */
-		uint8_t frame_offset = client->assigned_slot_start / 10U;
-		uint8_t slot_in_frame = client->assigned_slot_start % 10U;
+	
+	uint8_t frame_offset = client->assigned_slot_start / DECT_RADIO_FRAME_SLOT_COUNT;
+
+	uint8_t slot_in_frame = client->assigned_slot_start % DECT_RADIO_FRAME_SLOT_COUNT;
 
 		uint64_t tx_frame_time = superframe_start_time +
 			(frame_offset * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
@@ -215,12 +216,7 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 #define MAX_RACH_RX_ITEMS 16
 
 
-// Hardcoded for now
-static struct dect_phy_mac_cluster_tdma_client_cfg client1_cfg = {
-    .start_frame = 2,
-    .packets_per_superframe = 10,
-    .slots_per_packet = 4,
-};
+
 
 static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void);
 
@@ -743,7 +739,8 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 	dect_phy_mac_common_header_t *common_header,
 	dect_phy_mac_association_req_t *association_req, uint8_t **target_ptr, /* In/Out */
 	union nrf_modem_dect_phy_hdr *out_phy_header,
-	struct dect_phy_mac_client_info *client_info)
+	uint8_t assigned_slot_start
+	)
 {
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 	struct dect_phy_header_type2_format1_t header = {
@@ -797,7 +794,7 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 		.group_bit = 0,
 		.harq_conf_bit = 0, /* HARQ config accepted as in a request */
 		.flow_count = 7,    /* 0b111: all flows accepted as in request */
-		.assigned_slot_start = client_info->assigned_slot_start, /* Inform client of the assigned slot (0xFF if no slot assigned) */
+		.assigned_slot_start = assigned_slot_start, /* Inform client of the assigned slot (0xFF if no slot assigned) */
 		
 	};
 	/* TODO: The client needs to know the assigned slot  */
@@ -855,7 +852,8 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 
 	struct dect_phy_mac_client_info new_client = {
         .client_id = common_header->transmitter_id,
-        // For now, we assume 4 slots per packet as per your client1_cfg
+        // For now, we assume 4 slots per packet 
+		// TODO: Make them configurable
         .num_slots_needed = 4 
     };
 
@@ -872,13 +870,17 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 
 
     struct dect_phy_mac_client_info *assigned_client = dect_phy_mac_assign_slots(&new_client);
+	// Debug: print assigned_client info
+	printk("Assigned client %u slots [%d .. %d]",
+		   new_client.client_id, new_client.assigned_slot_start,
+		   new_client.assigned_slot_start + new_client.num_slots_needed - 1);
 
     if (assigned_client != NULL && associated_clients_count < MAX_CLIENTS) {
         associated_clients[associated_clients_count] = *assigned_client;
         associated_clients_count++;
     }
 
-    uint8_t encoded_resp_pdu[DECT_DATA_MAX_LEN];
+    
 
 
     // Pass the assigned_slot_start to the encoder so it can tell the client
@@ -916,8 +918,20 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 	 * Physical Layer Control Field: Type 2, Header Format: 001 and expects MAC PDU as
 	 * a response, the RD should consider the response window as a length of one frame.
 	 */
+	uint64_t now = dect_app_modem_time_now();
+	uint64_t latency = dect_phy_ctrl_modem_latency_for_next_op_get(true);
+
 	uint64_t resp_start_time =
-		req_received + req_len + (DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS / 2);
+		req_received + req_len +
+		(DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS / 2);
+
+	/* Ensure not in the past */
+	uint64_t earliest =
+		now + latency + US_TO_MODEM_TICKS(500);
+
+	if (resp_start_time < earliest) {
+		resp_start_time = earliest;
+	}
 
 	struct nrf_modem_dect_phy_tx_params tx_op; /* We need toi bypass scheduler */
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
