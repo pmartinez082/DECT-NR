@@ -75,6 +75,7 @@ int dect_common_utils_subslots_in_bytes(uint8_t subslots, uint8_t mcs);
 int8_t dect_common_utils_phy_tx_power_to_dbm(uint8_t phy_power);
 uint8_t dect_common_utils_dbm_to_phy_tx_power(int8_t pwr_dBm);
 uint8_t dect_common_utils_next_phy_tx_power_get(uint8_t phy_power);
+int dect_common_utils_max_slots_per_mcs(uint8_t mcs);
 
 /******************************************************************************/
 

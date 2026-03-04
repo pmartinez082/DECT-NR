@@ -246,6 +246,7 @@ typedef struct {
 	uint16_t next_cluster_channel;
 	uint32_t time_to_next;
 	uint16_t current_cluster_channel;
+	uint16_t needed_mcs;
 } dect_phy_mac_association_req_t;
 
 /* MAC spec: Table 6.4.2.5-2: Reject Cause and Reject Timer */

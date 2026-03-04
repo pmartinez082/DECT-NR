@@ -67,103 +67,166 @@ static struct {
 
 
 /**************************************************************************************************/
-
-static int dect_phy_mac_client_data_pdu_encode(struct dect_phy_mac_rach_tx_params *params,
-					       uint32_t nw_id_24msb, uint8_t nw_id_8lsb,
-					       uint16_t target_short_rd_id,
-					       uint8_t **target_ptr, /* In/Out */
-					       union nrf_modem_dect_phy_hdr *out_phy_header)
+static int dect_phy_mac_client_data_pdu_encode(
+        struct dect_phy_mac_rach_tx_params *params,
+        uint32_t nw_id_24msb,
+        uint8_t nw_id_8lsb,
+        uint16_t target_short_rd_id,
+        uint8_t **target_ptr,
+        union nrf_modem_dect_phy_hdr *out_phy_header)
 {
-	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-	struct dect_phy_header_type2_format1_t header = {
-		.packet_length = 1, /* calculated later based on needs */
-		.packet_length_type = DECT_PHY_HEADER_PKT_LENGTH_TYPE_SLOTS,
-		.format = DECT_PHY_HEADER_FORMAT_001, /* No HARQ feedback requested */
-		.short_network_id = nw_id_8lsb,
-		.transmitter_identity_hi = (uint8_t)(current_settings->common.short_rd_id >> 8),
-		.transmitter_identity_lo = (uint8_t)(current_settings->common.short_rd_id & 0xFF),
-		.df_mcs = params->mcs,
-		.transmit_power = dect_common_utils_dbm_to_phy_tx_power(params->tx_power_dbm),
-		.receiver_identity_hi = (uint8_t)(target_short_rd_id >> 8),
-		.receiver_identity_lo = (uint8_t)(target_short_rd_id & 0xFF),
-		.feedback.format1.format = 0,
-	};
-	dect_phy_mac_type_header_t type_header = {
-		.version = 0,
-		.security = 0, /* 0b00: Not used */
-		.type = DECT_PHY_MAC_HEADER_TYPE_PDU,
-	};
-	dect_phy_mac_common_header_t common_header = {
-		.type = DECT_PHY_MAC_HEADER_TYPE_PDU,
-		.reset = 1,
-		.seq_nbr = client_data.client_seq_nbr++,
-		.nw_id = nw_id_24msb, /* 24bit */
-		.transmitter_id = current_settings->common.transmitter_id,
-	};
-	uint8_t *pdu_ptr = *target_ptr;
+    struct dect_phy_settings *current_settings =
+        dect_common_settings_ref_get();
 
-	pdu_ptr = dect_phy_mac_pdu_type_header_encode(&type_header, pdu_ptr);
-	pdu_ptr = dect_phy_mac_pdu_common_header_encode(&common_header, pdu_ptr);
+    /* -------------------------------------------------- */
+    /* 1. Force MAXIMUM valid slot index for this MCS     */
+    /* -------------------------------------------------- */
 
-	sys_dlist_t sdu_list;
-	dect_phy_mac_sdu_t *data_sdu_list_item =
-		(dect_phy_mac_sdu_t *)k_calloc(1, sizeof(dect_phy_mac_sdu_t));
-	if (data_sdu_list_item == NULL) {
-		return -ENOMEM;
-	}
-	uint8_t dlc_header_size = DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING_LEN;
-	uint16_t dlc_payload_len = strlen(params->tx_data_str) + 1;
-	uint16_t payload_data_len = dlc_header_size + dlc_payload_len;
+    int8_t max_slot_index =
+        dect_common_utils_max_slots_per_mcs(params->mcs) - 1;
 
-	dect_phy_mac_mux_header_t mux_header1 = {
-		.mac_ext = DECT_PHY_MAC_EXT_16BIT_LEN,
-		.ie_type = DECT_PHY_MAC_IE_TYPE_USER_PLANE_DATA_FLOW1,
-		.payload_length = payload_data_len,
-	};
+    if (max_slot_index < 0)
+        return -EINVAL;
 
-	data_sdu_list_item->mux_header = mux_header1;
-	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_DATA_SDU;
-	memcpy(data_sdu_list_item->message.data_sdu.data, params->tx_data_str, dlc_payload_len);
-	data_sdu_list_item->message.data_sdu.data_length = dlc_payload_len;
-	data_sdu_list_item->message.data_sdu.dlc_ie_type =
-		DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING;
+    int total_byte_count =
+        dect_common_utils_slots_in_bytes(max_slot_index,
+                                         params->mcs);
 
-	sys_dlist_init(&sdu_list);
-	sys_dlist_append(&sdu_list, &data_sdu_list_item->dnode);
-	pdu_ptr = dect_phy_mac_pdu_sdus_encode(pdu_ptr, &sdu_list);
+    if (total_byte_count <= 0)
+        return -EINVAL;
 
-	/* Length so far  */
-	uint16_t encoded_pdu_length = pdu_ptr - *target_ptr;
+    /* -------------------------------------------------- */
+    /* 2. Prepare PHY header (length FIXED to max slot)   */
+    /* -------------------------------------------------- */
 
-	header.packet_length = dect_common_utils_phy_packet_length_calculate(
-		encoded_pdu_length, header.packet_length_type, header.df_mcs);
-	if (header.packet_length < 0) {
-		desh_error("(%s): Phy pkt len calculation failed", (__func__));
-		return -EINVAL;
-	}
-	int16_t total_byte_count =
-		dect_common_utils_slots_in_bytes(header.packet_length, header.df_mcs);
+    struct dect_phy_header_type2_format1_t header = {
+        .packet_length = max_slot_index,
+        .packet_length_type = DECT_PHY_HEADER_PKT_LENGTH_TYPE_SLOTS,
+        .format = DECT_PHY_HEADER_FORMAT_001,
+        .short_network_id = nw_id_8lsb,
+        .transmitter_identity_hi =
+            (uint8_t)(current_settings->common.short_rd_id >> 8),
+        .transmitter_identity_lo =
+            (uint8_t)(current_settings->common.short_rd_id & 0xFF),
+        .df_mcs = params->mcs,
+        .transmit_power =
+            dect_common_utils_dbm_to_phy_tx_power(params->tx_power_dbm),
+        .receiver_identity_hi = (uint8_t)(target_short_rd_id >> 8),
+        .receiver_identity_lo = (uint8_t)(target_short_rd_id & 0xFF),
+        .feedback.format1.format = 0,
+    };
 
-	if (total_byte_count <= 0) {
-		desh_error("Unsupported slot/mcs combination");
-		return -EINVAL;
-	}
-	/* Fill padding if needed */
-	int16_t padding_need = total_byte_count - encoded_pdu_length;
+    /* -------------------------------------------------- */
+    /* 3. Encode MAC headers                              */
+    /* -------------------------------------------------- */
 
-	int err = dect_phy_mac_pdu_sdu_list_add_padding(&pdu_ptr, &sdu_list, padding_need);
+    dect_phy_mac_type_header_t type_header = {
+        .version = 0,
+        .security = 0,
+        .type = DECT_PHY_MAC_HEADER_TYPE_PDU,
+    };
 
-	if (err) {
-		desh_warn("(%s): Failed to add padding: err %d (continue)", __func__, err);
-	}
+    dect_phy_mac_common_header_t common_header = {
+        .type = DECT_PHY_MAC_HEADER_TYPE_PDU,
+        .reset = 1,
+        .seq_nbr = client_data.client_seq_nbr++,
+        .nw_id = nw_id_24msb,
+        .transmitter_id = current_settings->common.transmitter_id,
+    };
 
-	*target_ptr = pdu_ptr;
+    uint8_t *pdu_start = *target_ptr;
+    uint8_t *pdu_ptr = pdu_start;
 
-	union nrf_modem_dect_phy_hdr phy_header;
+    pdu_ptr = dect_phy_mac_pdu_type_header_encode(&type_header, pdu_ptr);
+    pdu_ptr = dect_phy_mac_pdu_common_header_encode(&common_header, pdu_ptr);
 
-	memcpy(out_phy_header, &header, sizeof(phy_header.type_2));
+    /* -------------------------------------------------- */
+    /* 4. Create one USER PLANE SDU                       */
+    /* -------------------------------------------------- */
 
-	return header.packet_length;
+    sys_dlist_t sdu_list;
+    sys_dlist_init(&sdu_list);
+
+    dect_phy_mac_sdu_t *data_sdu =
+        k_calloc(1, sizeof(dect_phy_mac_sdu_t));
+    if (!data_sdu)
+        return -ENOMEM;
+
+    data_sdu->message_type = DECT_PHY_MAC_MESSAGE_TYPE_DATA_SDU;
+
+    data_sdu->mux_header.mac_ext =
+        DECT_PHY_MAC_EXT_16BIT_LEN;
+    data_sdu->mux_header.ie_type =
+        DECT_PHY_MAC_IE_TYPE_USER_PLANE_DATA_FLOW1;
+
+    /* -------------------------------------------------- */
+    /* 5. Determine how much payload fits                 */
+    /* -------------------------------------------------- */
+
+    uint16_t header_bytes_so_far = pdu_ptr - pdu_start;
+
+    uint16_t mux_overhead =
+        dect_phy_mac_pdu_mux_header_length_get(&data_sdu->mux_header);
+
+    uint16_t dlc_header_size =
+        DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING_LEN;
+
+    uint16_t available_payload =
+        total_byte_count
+        - header_bytes_so_far
+        - mux_overhead
+        - dlc_header_size;
+
+    if ((int)available_payload <= 0)
+        return -EINVAL;
+
+    /* -------------------------------------------------- */
+    /* 6. Fill payload deterministically (TDMA stress)    */
+    /* -------------------------------------------------- */
+
+    data_sdu->message.data_sdu.dlc_ie_type =
+        DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING;
+
+    data_sdu->message.data_sdu.data_length =
+        available_payload;
+
+    for (uint16_t i = 0; i < available_payload; i++)
+        data_sdu->message.data_sdu.data[i] = (uint8_t)i;
+
+    data_sdu->mux_header.payload_length =
+        dlc_header_size + available_payload;
+
+    sys_dlist_append(&sdu_list, &data_sdu->dnode);
+
+    /* -------------------------------------------------- */
+    /* 7. Encode SDU                                      */
+    /* -------------------------------------------------- */
+
+    pdu_ptr = dect_phy_mac_pdu_sdus_encode(pdu_ptr, &sdu_list);
+
+    uint16_t final_size = pdu_ptr - pdu_start;
+
+    /* -------------------------------------------------- */
+    /* 8. Safety check: must EXACTLY match transport size */
+    /* -------------------------------------------------- */
+
+    if (final_size != total_byte_count) {
+        printk("Size mismatch! final=%u expected=%u\n",
+               final_size, total_byte_count);
+        return -EINVAL;
+    }
+
+    /* -------------------------------------------------- */
+    /* 9. Output                                           */
+    /* -------------------------------------------------- */
+
+    *target_ptr = pdu_ptr;
+
+    memcpy(out_phy_header,
+           &header,
+           sizeof(out_phy_header->type_2));
+
+    return header.packet_length;
 }
 
 static int dect_phy_mac_client_tdma_schedule_tx(
@@ -625,6 +688,7 @@ static int dect_phy_mac_client_association_req_pdu_encode(
 		.max_harq_rx_retransmission_delay = 4, /* Coded value: 1ms */
 		/* The same that client_rach_tx uses: */
 		.flow_id = DECT_PHY_MAC_IE_TYPE_USER_PLANE_DATA_FLOW1,
+		.needed_mcs = params->mcs
 	};
 
 	data_sdu_list_item->mux_header = mux_header1;

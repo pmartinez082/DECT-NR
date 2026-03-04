@@ -849,12 +849,14 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 		       common_header->transmitter_id, common_header->transmitter_id);
 		return;
 	}
+	uint16_t needed_slots = dect_common_utils_max_slots_per_mcs(association_req->needed_mcs);
 
 	struct dect_phy_mac_client_info new_client = {
         .client_id = common_header->transmitter_id,
         // For now, we assume 4 slots per packet 
 		// TODO: Make them configurable
-        .num_slots_needed = 4 
+
+        .num_slots_needed = needed_slots
     };
 
 
