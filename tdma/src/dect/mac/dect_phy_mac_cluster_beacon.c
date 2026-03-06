@@ -853,8 +853,7 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
 
 	struct dect_phy_mac_client_info new_client = {
         .client_id = common_header->transmitter_id,
-        // For now, we assume 4 slots per packet 
-		// TODO: Make them configurable
+
 
         .num_slots_needed = needed_slots
     };

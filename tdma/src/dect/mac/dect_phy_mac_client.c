@@ -338,7 +338,7 @@ static int dect_phy_mac_client_tdma_schedule_tx(
         return -EBUSY;
     }
 
-    desh_print("Client TDMA TX scheduled: frame_time %llu, frame_offset %u, slot %u",
+    printk("Client TDMA TX scheduled: frame_time %llu, frame_offset %u, slot %u",
                tx_frame_time, frame_offset, slot_in_frame);
 
     return 0;
@@ -467,17 +467,18 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 
 	if (data->cmd_params.get_mdm_temp) {
 		char tmp_str[DECT_DATA_MAX_LEN * 2] = {0};
-		int mdm_temperature = dect_phy_ctrl_modem_temperature_get();
+		
 
 		/* JSON data:
 		beacon frame start slot, assigned slot, client id, tx power, payload len, payload
 		*/
-		sprintf(tmp_str, "{\"data\":\"%s\",\"m_tmp\":\"%d\",\"sequence_number\":\"%d\",\"payload_len\":\"%d\",\"payload\":\"%s\"}",
-			cmd_params.tx_data_str, mdm_temperature,
+		sprintf(tmp_str, "{\"data\":\"%s\",\"sequence_number\":\"%d\",\"payload_len\":\"%d\"}",
+			cmd_params.tx_data_str,
 			client_data.client_seq_nbr,
-			strlen(cmd_params.tx_data_str), cmd_params.tx_data_str);
+			strlen(cmd_params.tx_data_str));
 			
-		printk("JSON data:%s\n",tmp_str);
+		//printk("JSON data:%s\n",tmp_str);
+		desh_print("JSON data:%s\n", tmp_str);
 		memset(cmd_params.tx_data_str, 0, DECT_DATA_MAX_LEN);
 		strncpy(cmd_params.tx_data_str, tmp_str, DECT_DATA_MAX_LEN - 1);
 	}
@@ -552,6 +553,96 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	slot_count = ret + 1;
 
 	ra_start_mdm_ticks = dect_phy_mac_client_next_rach_tx_time_get(target_nbr);
+
+
+
+	#define TEST_FRAGMENT_COUNT 12
+
+uint64_t base_frame_time = ra_start_mdm_ticks;
+
+for (int frag = 0; frag < TEST_FRAGMENT_COUNT; frag++) {
+
+    uint8_t encoded_data_to_send[DECT_DATA_MAX_LEN];
+    uint8_t *pdu_ptr = encoded_data_to_send;
+    memset(encoded_data_to_send, 0, sizeof(encoded_data_to_send));
+
+    /* encode fragment */
+    ret = dect_phy_mac_client_data_pdu_encode(
+        params,
+        target_nbr->nw_id_24msb,
+        target_nbr->nw_id_8lsb,
+        target_nbr->short_rd_id,
+        &pdu_ptr,
+        &phy_header);
+
+    if (ret < 0)
+        return ret;
+
+    slot_count = ret + 1;
+
+    struct dect_phy_api_scheduler_list_item_config *sched_list_item_conf;
+
+    struct dect_phy_api_scheduler_list_item *sched_list_item =
+        dect_phy_api_scheduler_list_item_alloc_tx_element(&sched_list_item_conf);
+
+    if (!sched_list_item)
+        return -ENOMEM;
+
+    uint16_t encoded_pdu_length = pdu_ptr - encoded_data_to_send;
+
+    sched_list_item_conf->address_info.network_id = target_nbr->nw_id_32bit;
+    sched_list_item_conf->address_info.transmitter_long_rd_id =
+        current_settings->common.transmitter_id;
+    sched_list_item_conf->address_info.receiver_long_rd_id =
+        params->target_long_rd_id;
+
+    sched_list_item_conf->channel = target_nbr->channel;
+
+    /* TDMA FRAGMENTATION */
+    sched_list_item_conf->frame_time =
+        base_frame_time + (frag * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
+
+    sched_list_item_conf->start_slot = 0;
+
+    sched_list_item_conf->interval_mdm_ticks = 0;
+    sched_list_item_conf->length_slots = slot_count;
+    sched_list_item_conf->length_subslots = 0;
+
+    sched_list_item_conf->tx.phy_lbt_period = NRF_MODEM_DECT_LBT_PERIOD_MIN;
+    sched_list_item_conf->tx.phy_lbt_rssi_threshold_max =
+        current_settings->rssi_scan.busy_threshold;
+
+    sched_list_item_conf->tx.harq_feedback_requested = false;
+
+    sched_list_item->sched_config.tx.encoded_payload_pdu_size = encoded_pdu_length;
+
+    memcpy(
+        sched_list_item->sched_config.tx.encoded_payload_pdu,
+        encoded_data_to_send,
+        encoded_pdu_length);
+
+    sched_list_item->sched_config.tx.header_type = DECT_PHY_HEADER_TYPE2;
+
+    memcpy(
+        &sched_list_item->sched_config.tx.phy_header.type_2,
+        &phy_header.type_2,
+        sizeof(phy_header.type_2));
+
+    sched_list_item->priority = DECT_PRIORITY0_FORCE_TX;
+    sched_list_item->phy_op_handle = DECT_PHY_MAC_CLIENT_RA_TX_HANDLE + frag;
+
+    if (!dect_phy_api_scheduler_list_item_add(sched_list_item)) {
+
+        dect_phy_api_scheduler_list_item_dealloc(sched_list_item);
+        return -EBUSY;
+    }
+
+    desh_print("Fragment %d scheduled at frame_time %llu",
+               frag,
+               sched_list_item_conf->frame_time);
+}
+
+	/*
 	if (ra_start_mdm_ticks == 0) {
 		desh_error("(%s): Failed to get next RACH TX time", __func__);
 		return -EINVAL;
@@ -579,7 +670,6 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	sched_list_item_conf->frame_time = ra_start_mdm_ticks;
 	sched_list_item_conf->start_slot = 0;
 
-	client_data.last_tx_time_mdm_ticks = ra_start_mdm_ticks;
 
 	sched_list_item_conf->interval_mdm_ticks = 0;
 	sched_list_item_conf->length_slots = slot_count;
@@ -606,7 +696,7 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 		sched_list_item->phy_op_handle = DECT_PHY_MAC_CLIENT_RA_TX_CONTINUOUS_HANDLE;
 	}
 
-	/* Add tx operation to scheduler list */
+	//Add tx operation to scheduler list
 	if (!dect_phy_api_scheduler_list_item_add(sched_list_item)) {
 		desh_error("(%s): dect_phy_api_scheduler_list_item_add failed", (__func__));
 		dect_phy_api_scheduler_list_item_dealloc(sched_list_item);
@@ -621,6 +711,8 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 		   target_nbr->short_rd_id, target_nbr->nw_id_32bit, target_nbr->nw_id_32bit,
 		   params->tx_power_dbm, target_nbr->channel, encoded_pdu_length,
 		   beacon_interval_ms, sched_list_item_conf->frame_time, beacon_received);
+
+	*/
 
 	return 0;
 }
