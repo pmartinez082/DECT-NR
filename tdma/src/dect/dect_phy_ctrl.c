@@ -550,30 +550,35 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 			dect_common_utils_modem_phy_header_status_to_string(
 				params->pcc_status.header_status, tmp_str);
 			if (ctrl_data.debug) {
+				desh_print("PCC received at frame_time %llu", params->stf_start_time);
+				
+				/*
 				int16_t rssi_level = params->pcc_status.rssi_2 / 2;
-
 				desh_print("PCC received (stf start time %llu, handle %d): "
 					   "status: \"%s\", snr %d, "
 					   "RSSI-2 %d (RSSI %d)",
 					   params->stf_start_time, params->pcc_status.handle,
 					   tmp_str, params->pcc_status.snr,
 					   params->pcc_status.rssi_2, rssi_level);
+					   */
 			}
 			if (params->pcc_status.header_status ==
 			    NRF_MODEM_DECT_PHY_HDR_STATUS_VALID) {
+					/*
 				if (ctrl_data.debug) {
 					desh_print("  phy header: short nw id %d (0x%02x), "
 						   "transmitter id %u",
 						   params->short_nw_id, params->short_nw_id,
 						   params->transmitter_short_rd_id);
 					if (params->pcc_status.phy_type == 1) {
-						/* Type 2 header */
+						//Type 2 header
 						desh_print("  receiver id: %u",
 							params->receiver_short_rd_id);
 					}
 					desh_print("  len %d, MCS %d, TX pwr: %d dBm",
 						   params->phy_len, params->mcs, params->pwr_dbm);
-				}
+					
+				}*/
 			}
 			if (ctrl_data.ext_cmd.pcc_rcv_cb != NULL) {
 				ctrl_data.ext_cmd.pcc_rcv_cb(params);
@@ -594,16 +599,18 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 			}
 
 			if (!data_handled) {
+
 				unsigned char hex_data[128];
 				int i;
 				struct nrf_modem_dect_phy_pdc_event *p_rx_status =
 					&(params->rx_status);
 				int16_t rssi_level = p_rx_status->rssi_2 / 2;
-
+				desh_print("PDC received at frame_time %llu", params->time);
+				/*
 				desh_print("PDC received (time %llu): snr %d, RSSI-2 %d "
 					   "(RSSI %d), len %d",
 					   params->time, p_rx_status->snr, p_rx_status->rssi_2,
-					   rssi_level, params->data_length);
+					   rssi_level, params->data_length);*/
 				for (i = 0; i < 128 && i < params->data_length; i++) {
 					sprintf(&hex_data[i], "%02x ", params->data[i]);
 				}

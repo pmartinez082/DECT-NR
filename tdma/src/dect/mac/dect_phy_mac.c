@@ -284,6 +284,15 @@ static void dect_phy_mac_message_print(dect_phy_mac_message_type_t message_type,
 		break;
 	}
 }
+static void dect_phy_mac_print_tdma_info(
+					     dect_phy_mac_common_header_t *common_header, 
+					 uint64_t stf){
+
+		desh_print("PDC received at frame_time %llu", stf);
+	
+	
+
+}
 
 static void dect_phy_mac_type_header_print(dect_phy_mac_type_header_t *type_header)
 {
@@ -323,7 +332,11 @@ static void dect_phy_mac_common_header_print(dect_phy_mac_type_header_t *type_he
 }
 
 static void dect_phy_mac_mux_header_print(dect_phy_mac_mux_header_t *mux_header)
+
+
 {
+	desh_print("      Payload length: %u", mux_header->payload_length);
+	/*
 	char tmp_str[128] = {0};
 
 	desh_print("    MAC MUX header:");
@@ -333,14 +346,14 @@ static void dect_phy_mac_mux_header_print(dect_phy_mac_mux_header_t *mux_header)
 	desh_print("      Payload length: %u", mux_header->payload_length);
 	if (mux_header->ie_type == DECT_PHY_MAC_IE_TYPE_EXTENSION) {
 		desh_print("      IE extension: 0x%02x", mux_header->ie_ext);
-	}
+	}*/
 }
 
 static void dect_phy_mac_sdu_print(dect_phy_mac_sdu_t *sdu_list_item, int sdu_nbr)
 {
-	desh_print("  SDU %u:", sdu_nbr);
+	//desh_print("  SDU %u:", sdu_nbr);
 	dect_phy_mac_mux_header_print(&sdu_list_item->mux_header);
-	dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
+	//dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
 }
 
 bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
@@ -384,13 +397,18 @@ bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
 	int16_t rssi_level = p_rx_status->rssi_2 / 2;
 
 	if (print) {
+		/*
 		desh_print("PDC received (stf start time %llu, handle %d): snr %d, "
 			"RSSI-2 %d (RSSI %d), len %d",
 			rcv_params->time, p_rx_status->handle,
 			p_rx_status->snr, p_rx_status->rssi_2, rssi_level,
 			rcv_params->data_length);
+			*/
 
-		dect_phy_mac_type_header_print(&type_header);
+	
+		dect_phy_mac_print_tdma_info(&type_header, rcv_params->time);
+
+		//dect_phy_mac_type_header_print(&type_header);
 	}
 
 	/* Then continue on: ch. 6.3.3, MAC Common header */
