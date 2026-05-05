@@ -35,6 +35,7 @@ struct dect_phy_mac_rach_tx_params {
 	uint8_t mcs;
 	int8_t tx_power_dbm;
 	uint16_t interval_secs;
+	uint16_t tx_id; /* transmitted in RACH message payload as first two bytes */
 
 	char tx_data_str[DECT_DATA_MAX_LEN]; /* Note: cannot be that much on payload */
 };

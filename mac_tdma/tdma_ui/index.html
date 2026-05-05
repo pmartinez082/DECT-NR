@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DECT NR+ TDMA Control Panel</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <h1>DECT NR+ TDMA Control Panel</h1>
+
+  <!-- Debug Log -->
+  <div class="debug-panel">
+    <h2>Debug Log</h2>
+    <textarea id="debugLog" readonly></textarea>
+  </div>
+
+  <div class="container">
+    <!-- Master Panel -->
+    <div class="panel master-panel">
+      <h2>
+        Master (Fixed Termination - FT)
+        <span id="master-status-badge" class="status-badge disconnected">DISCONNECTED</span>
+      </h2>
+
+      <!-- Connection Controls -->
+      <div class="section connection-section">
+        <h3>Connection</h3>
+        <div class="form-group">
+          <label for="master-port-select">Serial Port:</label>
+          <div class="port-selector">
+            <select id="master-port-select">
+              <option value="">-- Select Port --</option>
+            </select>
+            <button id="master-refresh-ports" class="icon-btn" title="Refresh ports">🔄</button>
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="master-connect" class="btn-success">Connect</button>
+          <button id="master-disconnect" class="btn-danger" disabled>Disconnect</button>
+        </div>
+      </div>
+
+      <!-- Beacon Controls -->
+      <div id="beacon-controls" class="section beacon-section">
+        <h3>Beacon Setup (FT)</h3>
+        <div class="form-group">
+          <label for="beacon-channel">Channel:</label>
+          <input type="number" id="beacon-channel" min="1640" max="1680" value="1677">
+        </div>
+        <div class="button-group">
+          <button id="beacon-start" class="btn-primary">Start Beacon</button>
+          <button id="beacon-stop" class="btn-danger">Stop Beacon</button>
+        </div>
+      </div>
+
+      <!-- Master Output -->
+      <div class="output-section">
+        <h3>Output</h3>
+        <textarea id="master-output" readonly class="output-log"></textarea>
+        <button id="master-clear-output" class="btn-clear">Clear Output</button>
+      </div>
+    </div>
+
+    <!-- Slave 1 Panel -->
+    <div class="panel slave-panel" data-slave-num="1">
+      <h2>
+        Slave 1
+        <span id="slave1-status-badge" class="status-badge disconnected">DISCONNECTED</span>
+      </h2>
+      <div>Master ID: <span id="slave1-info-master-id">-</span></div>
+
+      <!-- Connection Controls -->
+      <div class="section connection-section">
+        <h3>Connection</h3>
+        <div class="form-group">
+          <label for="slave1-port-select">Serial Port:</label>
+          <div class="port-selector">
+            <select id="slave1-port-select">
+              <option value="">-- Select Port --</option>
+            </select>
+            <button id="slave1-refresh-ports" class="icon-btn" title="Refresh ports">🔄</button>
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="slave1-connect" class="btn-success">Connect</button>
+          <button id="slave1-disconnect" class="btn-danger" disabled>Disconnect</button>
+        </div>
+      </div>
+
+      <!-- Scan & Association Controls -->
+      <div id="slave1-controls" class="section association-section">
+        <h3>Beacon Scan & Association</h3>
+        <div class="form-group">
+          <label for="slave1-scan-channel">Scan Channel:</label>
+          <input type="number" id="slave1-scan-channel" min="1640" max="1680" value="1677">
+        </div>
+        <div class="button-group">
+          <button id="slave1-scan-btn" class="btn-info">Scan for Beacons</button>
+        </div>
+    
+        <div class="form-group">
+          <label for="slave1-associate-mcs">MCS (0-4):</label>
+          <select id="slave1-associate-mcs">
+            <option value="0">0</option>
+            <option value="1" selected>1</option>
+            <option value="2">2 - Medium</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+        <div class="button-group">
+          <button id="slave1-associate-btn" class="btn-primary">Associate</button>
+          <button id="slave1-dissociate-btn" class="btn-warning">Dissociate</button>
+        </div>
+      </div>
+
+      <!-- RACH TX Controls -->
+      <div id="slave1-rach-controls" class="section rach-section">
+        <h3>Random Access Channel (RACH) TX</h3>
+  
+        <div class="form-group">
+          <label for="slave1-rach-data">Data to Send:</label>
+          <input type="text" id="slave1-rach-data" placeholder="e.g., Hello World" value="Test Data">
+        </div>
+
+        <div class="form-group">
+          <label for="slave1-rach-mcs">MCS (0-4):</label>
+          <select id="slave1-rach-mcs">
+            <option value="0">0</option>
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="slave1-rach-master-id">Master ID:</label>
+          <input type="number" id="slave1-rach-master-id" placeholder="From association">
+        </div>
+
+        <div class="form-group">
+          <label for="slave1-rach-tx-power">TX Power (dBm):</label>
+          <input type="number" id="slave1-rach-tx-power" min="-20" max="20" step="1" value="0">
+          <small>Range: -20 to +20 dBm</small>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="slave1-rach-periodic">
+          <label for="slave1-rach-periodic">Periodic Transmission</label>
+        </div>
+
+        <div class="form-group">
+          <label for="slave1-rach-interval">Interval (seconds):</label>
+          <input type="number" id="slave1-rach-interval" min="1" max="3600" step="1" value="10" disabled>
+        </div>
+
+        <div class="button-group">
+          <button id="slave1-rach-start-btn" class="btn-primary">Start TX</button>
+          <button id="slave1-rach-stop-btn" class="btn-danger">Stop TX</button>
+        </div>
+      </div>
+
+      <!-- Slave Output -->
+      <div class="output-section">
+        <h3>Output</h3>
+        <textarea id="slave1-output" readonly class="output-log"></textarea>
+        <button id="slave1-clear-output" class="btn-clear">Clear Output</button>
+      </div>
+
+      <!-- Association Info -->
+      <div id="slave1-association-info" class="association-info" style="display:none;">
+        <strong>✓ Associated to Beacon</strong>
+        <div>TX ID: <span id="slave1-info-tx-id">-</span></div>
+        <div>MCS: <span id="slave1-info-mcs">-</span></div>
+      </div>
+    </div>
+
+    <!-- Slave 2 Panel -->
+    <div class="panel slave-panel" data-slave-num="2">
+      <h2>
+        Slave 2
+        <span id="slave2-status-badge" class="status-badge disconnected">DISCONNECTED</span>
+      </h2>
+      <div>Master ID: <span id="slave2-info-master-id">-</span></div>
+
+      <!-- Connection Controls -->
+      <div class="section connection-section">
+        <h3>Connection</h3>
+        <div class="form-group">
+          <label for="slave2-port-select">Serial Port:</label>
+          <div class="port-selector">
+            <select id="slave2-port-select">
+              <option value="">-- Select Port --</option>
+            </select>
+            <button id="slave2-refresh-ports" class="icon-btn" title="Refresh ports">🔄</button>
+          </div>
+        </div>
+        <div class="button-group">
+          <button id="slave2-connect" class="btn-success">Connect</button>
+          <button id="slave2-disconnect" class="btn-danger" disabled>Disconnect</button>
+        </div>
+      </div>
+
+      <!-- Scan & Association Controls -->
+      <div id="slave2-controls" class="section association-section">
+        <h3>Beacon Scan & Association</h3>
+        <div class="form-group">
+          <label for="slave2-scan-channel">Scan Channel:</label>
+          <input type="number" id="slave2-scan-channel" min="1640" max="1680" value="1677">
+        </div>
+        <div class="button-group">
+          <button id="slave2-scan-btn" class="btn-info">Scan for Beacons</button>
+        </div>
+  
+        <div class="form-group">
+          <label for="slave2-associate-mcs">MCS (0-4):</label>
+          <select id="slave2-associate-mcs">
+            <option value="0">0</option>
+            <option value="1" selected>1</option>
+            <option value="2">2 - Medium</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+        <div class="button-group">
+          <button id="slave2-associate-btn" class="btn-primary">Associate</button>
+          <button id="slave2-dissociate-btn" class="btn-warning">Dissociate</button>
+        </div>
+      </div>
+
+      <!-- RACH TX Controls -->
+      <div id="slave2-rach-controls" class="section rach-section">
+        <h3>Random Access Channel (RACH) TX</h3>
+  
+        <div class="form-group">
+          <label for="slave2-rach-data">Data to Send:</label>
+          <input type="text" id="slave2-rach-data" placeholder="e.g., Hello World" value="Test Data">
+        </div>
+
+        <div class="form-group">
+          <label for="slave2-rach-mcs">MCS (0-4):</label>
+          <select id="slave2-rach-mcs">
+            <option value="0">0</option>
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="slave2-rach-master-id">Master ID:</label>
+          <input type="number" id="slave2-rach-master-id" placeholder="From association">
+        </div>
+
+        <div class="form-group">
+          <label for="slave2-rach-tx-power">TX Power (dBm):</label>
+          <input type="number" id="slave2-rach-tx-power" min="-20" max="20" step="1" value="0">
+          <small>Range: -20 to +20 dBm</small>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="slave2-rach-periodic">
+          <label for="slave2-rach-periodic">Periodic Transmission</label>
+        </div>
+
+        <div class="form-group">
+          <label for="slave2-rach-interval">Interval (seconds):</label>
+          <input type="number" id="slave2-rach-interval" min="1" max="3600" step="1" value="10" disabled>
+        </div>
+
+        <div class="button-group">
+          <button id="slave2-rach-start-btn" class="btn-primary">Start TX</button>
+          <button id="slave2-rach-stop-btn" class="btn-danger">Stop TX</button>
+        </div>
+      </div>
+
+      <!-- Slave Output -->
+      <div class="output-section">
+        <h3>Output</h3>
+        <textarea id="slave2-output" readonly class="output-log"></textarea>
+        <button id="slave2-clear-output" class="btn-clear">Clear Output</button>
+      </div>
+
+      <!-- Association Info -->
+      <div id="slave2-association-info" class="association-info" style="display:none;">
+        <strong>✓ Associated to Beacon</strong>
+        <div>TX ID: <span id="slave2-info-tx-id">-</span></div>
+        <div>MCS: <span id="slave2-info-mcs">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+
+</html>

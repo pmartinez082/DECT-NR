@@ -72,6 +72,7 @@ static int dect_phy_mac_client_data_pdu_encode(
         uint32_t nw_id_24msb,
         uint8_t nw_id_8lsb,
         uint16_t target_short_rd_id,
+        uint16_t seq_nbr,
         uint8_t **target_ptr,
         union nrf_modem_dect_phy_hdr *out_phy_header)
 {
@@ -126,13 +127,13 @@ static int dect_phy_mac_client_data_pdu_encode(
         .type = DECT_PHY_MAC_HEADER_TYPE_PDU,
     };
 
-    dect_phy_mac_common_header_t common_header = {
-        .type = DECT_PHY_MAC_HEADER_TYPE_PDU,
-        .reset = 1,
-        .seq_nbr = client_data.client_seq_nbr++,
-        .nw_id = nw_id_24msb,
-        .transmitter_id = current_settings->common.transmitter_id,
-    };
+	dect_phy_mac_common_header_t common_header = {
+    .type = DECT_PHY_MAC_HEADER_TYPE_PDU,
+    .reset = 1,
+    .seq_nbr = seq_nbr,
+    .nw_id = nw_id_24msb,
+    .transmitter_id = current_settings->common.transmitter_id,
+	};
 
     uint8_t *pdu_start = *target_ptr;
     uint8_t *pdu_ptr = pdu_start;
@@ -181,7 +182,7 @@ static int dect_phy_mac_client_data_pdu_encode(
         return -EINVAL;
 
     /* -------------------------------------------------- */
-    /* 6. Fill payload deterministically (TDMA stress)    */
+    /* 6. Fill payload with tx_id and deterministic data  */
     /* -------------------------------------------------- */
 
     data_sdu->message.data_sdu.dlc_ie_type =
@@ -190,8 +191,18 @@ static int dect_phy_mac_client_data_pdu_encode(
     data_sdu->message.data_sdu.data_length =
         available_payload;
 
-    for (uint16_t i = 0; i < available_payload; i++)
-        data_sdu->message.data_sdu.data[i] = (uint8_t)i;
+    /* Include tx_id as first two bytes of payload */
+    if (available_payload >= 2) {
+        data_sdu->message.data_sdu.data[0] = (uint8_t)((params->tx_id >> 8) & 0xFF);
+        data_sdu->message.data_sdu.data[1] = (uint8_t)(params->tx_id & 0xFF);
+        /* Fill rest with deterministic pattern starting from byte 2 */
+        for (uint16_t i = 2; i < available_payload; i++)
+            data_sdu->message.data_sdu.data[i] = (uint8_t)(i - 2);
+    } else {
+        /* Fallback if payload is too small for tx_id */
+        for (uint16_t i = 0; i < available_payload; i++)
+            data_sdu->message.data_sdu.data[i] = (uint8_t)i;
+    }
 
     data_sdu->mux_header.payload_length =
         dlc_header_size + available_payload;
@@ -274,6 +285,7 @@ static int dect_phy_mac_client_tdma_schedule_tx(
         .mcs               = current_settings->tx.mcs,
         .tx_power_dbm      = current_settings->tx.power_dbm,
         .interval_secs     = 0,
+        .tx_id             = (uint16_t)current_settings->common.transmitter_id,
     };
 
     snprintf(rach_params.tx_data_str, sizeof(rach_params.tx_data_str),
@@ -289,6 +301,7 @@ static int dect_phy_mac_client_tdma_schedule_tx(
                     target_nbr->nw_id_24msb,
                     target_nbr->nw_id_8lsb,
                     target_nbr->short_rd_id,
+					client_data.client_seq_nbr,
                     &pdu_ptr, &phy_header);
     if (ret < 0) {
         desh_error("(%s): Failed to encode TDMA data PDU: %d", __func__, ret);
@@ -541,11 +554,17 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 	uint8_t slot_count = 0;
 
 	memset(encoded_data_to_send, 0, DECT_DATA_MAX_LEN);
+	uint16_t seq_nbr = client_data.client_seq_nbr++;
 
 	/* Encode data PDU to be sent */
-	ret = dect_phy_mac_client_data_pdu_encode(params, target_nbr->nw_id_24msb,
-						  target_nbr->nw_id_8lsb, target_nbr->short_rd_id,
-						  &pdu_ptr, &phy_header);
+	ret = dect_phy_mac_client_data_pdu_encode(
+        params,
+        target_nbr->nw_id_24msb,
+        target_nbr->nw_id_8lsb,
+        target_nbr->short_rd_id,
+        seq_nbr,
+        &pdu_ptr,
+        &phy_header);
 	if (ret < 0) {
 		desh_error("(%s): Failed to encode client data pdu", __func__);
 		return ret;
@@ -556,22 +575,26 @@ static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *t
 
 
 
-	#define TEST_FRAGMENT_COUNT 12
+#define TEST_FRAGMENT_COUNT 12
 
 uint64_t base_frame_time = ra_start_mdm_ticks;
 
 for (int frag = 0; frag < TEST_FRAGMENT_COUNT; frag++) {
+
+    /* Set tx_id for this fragment */
+    params->tx_id = (uint16_t)current_settings->common.transmitter_id;
 
     uint8_t encoded_data_to_send[DECT_DATA_MAX_LEN];
     uint8_t *pdu_ptr = encoded_data_to_send;
     memset(encoded_data_to_send, 0, sizeof(encoded_data_to_send));
 
     /* encode fragment */
-    ret = dect_phy_mac_client_data_pdu_encode(
+	ret = dect_phy_mac_client_data_pdu_encode(
         params,
         target_nbr->nw_id_24msb,
         target_nbr->nw_id_8lsb,
         target_nbr->short_rd_id,
+        seq_nbr,
         &pdu_ptr,
         &phy_header);
 
@@ -600,7 +623,7 @@ for (int frag = 0; frag < TEST_FRAGMENT_COUNT; frag++) {
 
     /* TDMA FRAGMENTATION */
     sched_list_item_conf->frame_time =
-        base_frame_time + (frag * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
+        base_frame_time + (2*frag * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS); // actual frame time is double the constant (????) lol
 
     sched_list_item_conf->start_slot = 0;
 
