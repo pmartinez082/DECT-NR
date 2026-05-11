@@ -30,12 +30,15 @@
 #include "dect_phy_mac_ctrl.h"
 
 /* TDMA slot bookkeeping for associated clients */
-#define MAX_SLOTS 256  /* number of logical TDMA slots */
+#define MAX_SLOTS 24  /* number of logical TDMA slots */
 #define SLOT_FREE 0
 #define SLOT_RESERVED 1
 
 struct dect_phy_mac_slot_map {
 	uint8_t slots[MAX_SLOTS]; /* 0 = free, 1 = reserved */
+	
+	
+	
 };
 
 struct dect_phy_mac_client_info associated_clients[MAX_CLIENTS];
@@ -68,7 +71,7 @@ static int find_free_slots(uint8_t needed_slots)
 	int start = -1;
 	int count = 0;
 
-	for (int i = 0; i < MAX_SLOTS; i++) {
+	for (int i = 1; i < MAX_SLOTS-1; i++) { // blocking slot 0
 		if (global_slot_map.slots[i] == SLOT_FREE) {
 			if (start == -1) {
 				start = i;
@@ -782,7 +785,8 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 	if (data_sdu_list_item == NULL) {
 		return -ENOMEM;
 	}
-	uint16_t payload_data_len = DECT_PHY_MAC_ASSOCIATION_RESP_MIN_LEN;
+	/* ACK payload: flags + flow_id + assigned_slot_start */
+	uint16_t payload_data_len = 3;
 	dect_phy_mac_mux_header_t mux_header1 = {
 		.mac_ext = DECT_PHY_MAC_EXT_8BIT_LEN,
 		.ie_type = DECT_PHY_MAC_IE_TYPE_ASSOCIATION_RESP,
@@ -791,12 +795,16 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 
 	/* Encode association response: we are dummy beacon and accepting everything  */
 	dect_phy_mac_association_resp_t association_resp = {
+		.ack_bit = 1,
 		.group_bit = 0,
 		.harq_conf_bit = 0, /* HARQ config accepted as in a request */
 		.flow_count = 7,    /* 0b111: all flows accepted as in request */
+		.flow_id = {0},
 		.assigned_slot_start = assigned_slot_start, /* Inform client of the assigned slot (0xFF if no slot assigned) */
 		
 	};
+
+
 	/* TODO: The client needs to know the assigned slot  */
 	data_sdu_list_item->mux_header = mux_header1;
 	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_ASSOCIATION_RESP;
@@ -881,9 +889,9 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
         associated_clients_count++;
     }
 
-    
-
-
+    printk("Handling Association Req from client %u (0x%04x), needed mcs %d, needed slots %d. Assigned slot start: %d\n",
+		   common_header->transmitter_id, common_header->transmitter_id, association_req->needed_mcs,
+		   assigned_client ? assigned_client->num_slots_needed : 0, new_client.assigned_slot_start);
     // Pass the assigned_slot_start to the encoder so it can tell the client
     ret = dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
                 rcv_params, 

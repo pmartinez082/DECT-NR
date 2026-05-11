@@ -1,0 +1,409 @@
+=== TDMA Master Output Log - Started at 2026-05-06T14:59:03.223Z ===
+2026-05-06T15:01:04.213Z - Beacon TX callback fired: frame_time=63265196136
+2026-05-06T15:01:06.221Z - Beacon TX callback fired: frame_time=63403436136
+2026-05-06T15:01:08.230Z - Beacon TX callback fired: frame_time=63541676136
+2026-05-06T15:01:08.807Z - dect mac beacon_start -c 1677
+2026-05-06T15:01:08.809Z - Beacon already started
+2026-05-06T15:01:08.813Z - Cannot start beacon, err -120
+2026-05-06T15:01:10.238Z - desh:~$ Beacon TX callback fired: frame_time=63679916136
+2026-05-06T15:01:12.146Z - Beacon TX callback fired: frame_time=63818156136
+2026-05-06T15:01:14.155Z - Beacon TX callback fired: frame_time=63956396136
+2026-05-06T15:01:16.163Z - Beacon TX callback fired: frame_time=64094636136
+2026-05-06T15:01:18.172Z - Beacon TX callback fired: frame_time=64232876136
+2026-05-06T15:01:20.180Z - Beacon TX callback fired: frame_time=64371116136
+2026-05-06T15:01:22.190Z - Beacon TX callback fired: frame_time=64509356136
+2026-05-06T15:01:24.198Z - Beacon TX callback fired: frame_time=64647596136
+2026-05-06T15:01:26.206Z - Beacon TX callback fired: frame_time=64785836136
+2026-05-06T15:01:28.215Z - Beacon TX callback fired: frame_time=64924076136
+2026-05-06T15:01:30.223Z - Beacon TX callback fired: frame_time=65062316136
+2026-05-06T15:01:32.231Z - Beacon TX callback fired: frame_time=65200556136
+2026-05-06T15:01:34.240Z - Beacon TX callback fired: frame_time=65338796136
+2026-05-06T15:01:36.149Z - Beacon TX callback fired: frame_time=65477036136
+2026-05-06T15:01:38.157Z - Beacon TX callback fired: frame_time=65615276136
+2026-05-06T15:01:40.165Z - Beacon TX callback fired: frame_time=65753516136
+2026-05-06T15:01:42.174Z - Beacon TX callback fired: frame_time=65891756136
+2026-05-06T15:01:42.656Z - Assigned client 1234 slots [0 .. 6]Assigned client 1234 slots [0 .. 6][8D[JPDC received at frame_time 65891957736
+2026-05-06T15:01:42.660Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:01:42.664Z - desh:~$ [8D[J      Seq Nbr: 0
+2026-05-06T15:01:42.670Z - desh:~$ [8D[J      Receiver: 5678 (0x0000162e)
+2026-05-06T15:01:42.675Z - desh:~$ [8D[J      Transmitter: 1234 (0x000004d2)
+2026-05-06T15:01:42.679Z - desh:~$ [8D[J      Payload length: 5
+2026-05-06T15:01:42.684Z - desh:~$ [8D[J      Payload length: 17
+2026-05-06T15:01:42.690Z - desh:~$ [8D[JBeacon TX for Association Resp completed.
+2026-05-06T15:01:44.182Z - desh:~$ Beacon TX callback fired: frame_time=66029996136
+2026-05-06T15:01:46.191Z - Beacon TX callback fired: frame_time=66168236136
+2026-05-06T15:01:48.199Z - Beacon TX callback fired: frame_time=66306476136
+2026-05-06T15:01:50.208Z - Beacon TX callback fired: frame_time=66444716136
+2026-05-06T15:01:52.216Z - Beacon TX callback fired: frame_time=66582956136
+2026-05-06T15:01:54.225Z - Beacon TX callback fired: frame_time=66721196136
+2026-05-06T15:01:56.234Z - Beacon TX callback fired: frame_time=66859436136
+2026-05-06T15:01:58.243Z - Beacon TX callback fired: frame_time=66997676136
+2026-05-06T15:02:00.151Z - Beacon TX callback fired: frame_time=67135916136
+2026-05-06T15:02:02.159Z - Beacon TX callback fired: frame_time=67274156136
+2026-05-06T15:02:02.673Z - [8D[JPDC received at frame_time 67275740136
+2026-05-06T15:02:02.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.681Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.686Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.693Z - desh:~$ [8D[JPDC received at frame_time 67277122536
+2026-05-06T15:02:02.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.701Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.713Z - desh:~$ [8D[JPDC received at frame_time 67278504916
+2026-05-06T15:02:02.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.721Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.725Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.733Z - desh:~$ [8D[JPDC received at frame_time 67279887316
+2026-05-06T15:02:02.737Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.741Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.745Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.753Z - desh:~$ [8D[JPDC received at frame_time 67281269716
+2026-05-06T15:02:02.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.761Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.765Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.773Z - desh:~$ [8D[JPDC received at frame_time 67282652116
+2026-05-06T15:02:02.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.781Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.785Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.793Z - desh:~$ [8D[JPDC received at frame_time 67284034516
+2026-05-06T15:02:02.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.801Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.805Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.813Z - desh:~$ [8D[JPDC received at frame_time 67285416916
+2026-05-06T15:02:02.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.821Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.826Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.833Z - desh:~$ [8D[JPDC received at frame_time 67286799316
+2026-05-06T15:02:02.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.841Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.846Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.853Z - desh:~$ [8D[JPDC received at frame_time 67288181716
+2026-05-06T15:02:02.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.861Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.865Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.873Z - desh:~$ [8D[JPDC received at frame_time 67289564116
+2026-05-06T15:02:02.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.881Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.886Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.893Z - desh:~$ [8D[JPDC received at frame_time 67290946516
+2026-05-06T15:02:02.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.901Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.905Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.913Z - desh:~$ [8D[JPDC received at frame_time 67292328916
+2026-05-06T15:02:02.917Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.921Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.925Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.933Z - desh:~$ [8D[JPDC received at frame_time 67293711316
+2026-05-06T15:02:02.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.941Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.946Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:02.953Z - desh:~$ [8D[JPDC received at frame_time 67295093716
+2026-05-06T15:02:02.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:02.961Z - desh:~$ [8D[J      Seq Nbr: 1
+2026-05-06T15:02:02.966Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.168Z - desh:~$ Beacon TX callback fired: frame_time=67412396136
+2026-05-06T15:02:04.673Z - [8D[JPDC received at frame_time 67413980116
+2026-05-06T15:02:04.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.681Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.685Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.693Z - desh:~$ [8D[JPDC received at frame_time 67415362516
+2026-05-06T15:02:04.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.701Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.713Z - desh:~$ [8D[JPDC received at frame_time 67416744916
+2026-05-06T15:02:04.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.721Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.725Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.733Z - desh:~$ [8D[JPDC received at frame_time 67418127316
+2026-05-06T15:02:04.738Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.741Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.745Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.753Z - desh:~$ [8D[JPDC received at frame_time 67419509716
+2026-05-06T15:02:04.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.761Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.765Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.773Z - desh:~$ [8D[JPDC received at frame_time 67420892116
+2026-05-06T15:02:04.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.781Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.785Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.793Z - desh:~$ [8D[JPDC received at frame_time 67422274516
+2026-05-06T15:02:04.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.801Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.806Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.814Z - desh:~$ [8D[JPDC received at frame_time 67423656916
+2026-05-06T15:02:04.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.821Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.825Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.833Z - desh:~$ [8D[JPDC received at frame_time 67425039316
+2026-05-06T15:02:04.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.841Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.845Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.853Z - desh:~$ [8D[JPDC received at frame_time 67426421716
+2026-05-06T15:02:04.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.861Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.865Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.873Z - desh:~$ [8D[JPDC received at frame_time 67427804116
+2026-05-06T15:02:04.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.881Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.885Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.893Z - desh:~$ [8D[JPDC received at frame_time 67429186516
+2026-05-06T15:02:04.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.901Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.905Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.913Z - desh:~$ [8D[JPDC received at frame_time 67430568916
+2026-05-06T15:02:04.917Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.921Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.925Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.933Z - desh:~$ [8D[JPDC received at frame_time 67431951316
+2026-05-06T15:02:04.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.941Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.945Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:04.953Z - desh:~$ [8D[JPDC received at frame_time 67433333716
+2026-05-06T15:02:04.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:04.961Z - desh:~$ [8D[J      Seq Nbr: 2
+2026-05-06T15:02:04.965Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.177Z - desh:~$ Beacon TX callback fired: frame_time=67550636136
+2026-05-06T15:02:06.673Z - [8D[JPDC received at frame_time 67552220176
+2026-05-06T15:02:06.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.681Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.686Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.693Z - desh:~$ [8D[JPDC received at frame_time 67553602576
+2026-05-06T15:02:06.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.701Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.713Z - desh:~$ [8D[JPDC received at frame_time 67554984976
+2026-05-06T15:02:06.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.721Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.725Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.733Z - desh:~$ [8D[JPDC received at frame_time 67556367376
+2026-05-06T15:02:06.737Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.741Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.745Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.753Z - desh:~$ [8D[JPDC received at frame_time 67557749776
+2026-05-06T15:02:06.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.761Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.766Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.773Z - desh:~$ [8D[JPDC received at frame_time 67559132176
+2026-05-06T15:02:06.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.781Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.786Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.793Z - desh:~$ [8D[JPDC received at frame_time 67560514576
+2026-05-06T15:02:06.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.801Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.806Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.813Z - desh:~$ [8D[JPDC received at frame_time 67561896976
+2026-05-06T15:02:06.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.821Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.825Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.833Z - desh:~$ [8D[JPDC received at frame_time 67563279376
+2026-05-06T15:02:06.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.841Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.846Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.853Z - desh:~$ [8D[JPDC received at frame_time 67564661776
+2026-05-06T15:02:06.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.861Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.866Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.873Z - desh:~$ [8D[JPDC received at frame_time 67566044176
+2026-05-06T15:02:06.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.881Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.885Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.893Z - desh:~$ [8D[JPDC received at frame_time 67567426576
+2026-05-06T15:02:06.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.901Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.906Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.913Z - desh:~$ [8D[JPDC received at frame_time 67568808976
+2026-05-06T15:02:06.918Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.921Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.925Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.933Z - desh:~$ [8D[JPDC received at frame_time 67570191376
+2026-05-06T15:02:06.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.941Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.945Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:06.953Z - desh:~$ [8D[JPDC received at frame_time 67571573776
+2026-05-06T15:02:06.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:06.961Z - desh:~$ [8D[J      Seq Nbr: 3
+2026-05-06T15:02:06.966Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.185Z - desh:~$ Beacon TX callback fired: frame_time=67688876136
+2026-05-06T15:02:08.673Z - [8D[JPDC received at frame_time 67690460156
+2026-05-06T15:02:08.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.681Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.685Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.693Z - desh:~$ [8D[JPDC received at frame_time 67691842556
+2026-05-06T15:02:08.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.702Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.713Z - desh:~$ [8D[JPDC received at frame_time 67693224956
+2026-05-06T15:02:08.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.721Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.725Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.733Z - desh:~$ [8D[JPDC received at frame_time 67694607356
+2026-05-06T15:02:08.737Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.741Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.745Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.753Z - desh:~$ [8D[JPDC received at frame_time 67695989756
+2026-05-06T15:02:08.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.761Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.765Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.773Z - desh:~$ [8D[JPDC received at frame_time 67697372156
+2026-05-06T15:02:08.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.781Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.785Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.793Z - desh:~$ [8D[JPDC received at frame_time 67698754556
+2026-05-06T15:02:08.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.801Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.806Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.813Z - desh:~$ [8D[JPDC received at frame_time 67700136956
+2026-05-06T15:02:08.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.821Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.825Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.833Z - desh:~$ [8D[JPDC received at frame_time 67701519356
+2026-05-06T15:02:08.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.841Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.845Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.853Z - desh:~$ [8D[JPDC received at frame_time 67702901756
+2026-05-06T15:02:08.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.861Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.865Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.873Z - desh:~$ [8D[JPDC received at frame_time 67704284156
+2026-05-06T15:02:08.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.881Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.886Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.893Z - desh:~$ [8D[JPDC received at frame_time 67705666556
+2026-05-06T15:02:08.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.901Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.906Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.913Z - desh:~$ [8D[JPDC received at frame_time 67707048956
+2026-05-06T15:02:08.917Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.921Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.925Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.933Z - desh:~$ [8D[JPDC received at frame_time 67708431356
+2026-05-06T15:02:08.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.941Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.946Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:08.953Z - desh:~$ [8D[JPDC received at frame_time 67709813756
+2026-05-06T15:02:08.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:08.961Z - desh:~$ [8D[J      Seq Nbr: 4
+2026-05-06T15:02:08.966Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.194Z - desh:~$ Beacon TX callback fired: frame_time=67827116136
+2026-05-06T15:02:10.673Z - [8D[JPDC received at frame_time 67828700156
+2026-05-06T15:02:10.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.681Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.686Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.693Z - desh:~$ [8D[JPDC received at frame_time 67830082556
+2026-05-06T15:02:10.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.701Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.713Z - desh:~$ [8D[JPDC received at frame_time 67831464956
+2026-05-06T15:02:10.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.721Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.725Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.733Z - desh:~$ [8D[JPDC received at frame_time 67832847356
+2026-05-06T15:02:10.737Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.741Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.745Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.753Z - desh:~$ [8D[JPDC received at frame_time 67834229756
+2026-05-06T15:02:10.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.761Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.766Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.773Z - desh:~$ [8D[JPDC received at frame_time 67835612156
+2026-05-06T15:02:10.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.781Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.785Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.793Z - desh:~$ [8D[JPDC received at frame_time 67836994556
+2026-05-06T15:02:10.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.801Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.806Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.813Z - desh:~$ [8D[JPDC received at frame_time 67838376956
+2026-05-06T15:02:10.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.821Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.825Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.833Z - desh:~$ [8D[JPDC received at frame_time 67839759356
+2026-05-06T15:02:10.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.841Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.846Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.853Z - desh:~$ [8D[JPDC received at frame_time 67841141756
+2026-05-06T15:02:10.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.861Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.865Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.873Z - desh:~$ [8D[JPDC received at frame_time 67842524156
+2026-05-06T15:02:10.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.881Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.886Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.893Z - desh:~$ [8D[JPDC received at frame_time 67843906556
+2026-05-06T15:02:10.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.901Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.905Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.913Z - desh:~$ [8D[JPDC received at frame_time 67845288956
+2026-05-06T15:02:10.917Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.921Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.926Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.933Z - desh:~$ [8D[JPDC received at frame_time 67846671356
+2026-05-06T15:02:10.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.941Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.945Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:10.953Z - desh:~$ [8D[JPDC received at frame_time 67848053756
+2026-05-06T15:02:10.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:10.961Z - desh:~$ [8D[J      Seq Nbr: 5
+2026-05-06T15:02:10.965Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:12.202Z - desh:~$ Beacon TX callback fired: frame_time=67965356136
+2026-05-06T15:02:14.210Z - Beacon TX callback fired: frame_time=68103596136
+2026-05-06T15:02:14.673Z - [8D[JPDC received at frame_time 68105180136
+2026-05-06T15:02:14.677Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.681Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.686Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.693Z - desh:~$ [8D[JPDC received at frame_time 68106562536
+2026-05-06T15:02:14.697Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.701Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.705Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.713Z - desh:~$ [8D[JPDC received at frame_time 68107944936
+2026-05-06T15:02:14.717Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.721Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.726Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.733Z - desh:~$ [8D[JPDC received at frame_time 68109327336
+2026-05-06T15:02:14.737Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.741Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.746Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.753Z - desh:~$ [8D[JPDC received at frame_time 68110709736
+2026-05-06T15:02:14.757Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.761Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.765Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.773Z - desh:~$ [8D[JPDC received at frame_time 68112092136
+2026-05-06T15:02:14.777Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.781Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.786Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.795Z - desh:~$ [8D[JPDC received at frame_time 68113474536
+2026-05-06T15:02:14.797Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.801Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.806Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.813Z - desh:~$ [8D[JPDC received at frame_time 68114856936
+2026-05-06T15:02:14.817Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.821Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.826Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.833Z - desh:~$ [8D[JPDC received at frame_time 68116239336
+2026-05-06T15:02:14.837Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.841Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.845Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.853Z - desh:~$ [8D[JPDC received at frame_time 68117621736
+2026-05-06T15:02:14.857Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.861Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.866Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.873Z - desh:~$ [8D[JPDC received at frame_time 68119004136
+2026-05-06T15:02:14.877Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.881Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.885Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.893Z - desh:~$ [8D[JPDC received at frame_time 68120386536
+2026-05-06T15:02:14.897Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.901Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.905Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.913Z - desh:~$ [8D[JPDC received at frame_time 68121768936
+2026-05-06T15:02:14.917Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.921Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.925Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.933Z - desh:~$ [8D[JPDC received at frame_time 68123151336
+2026-05-06T15:02:14.937Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.941Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.946Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:14.953Z - desh:~$ [8D[JPDC received at frame_time 68124533736
+2026-05-06T15:02:14.957Z - desh:~$ [8D[J      Reset: yes
+2026-05-06T15:02:14.961Z - desh:~$ [8D[J      Seq Nbr: 6
+2026-05-06T15:02:14.965Z - desh:~$ [8D[J      Payload length: 417
+2026-05-06T15:02:16.219Z - desh:~$ Beacon TX callback fired: frame_time=68241836136

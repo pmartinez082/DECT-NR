@@ -438,6 +438,7 @@ static const char dect_phy_mac_rach_tx_cmd_usage_str[] =
 	"Usage: dect mac rach_tx [stop] | -d <data> [<options>]\n"
 	"Options:\n"
 	"  -d, --data <data_str>,  Data to be sent.\n"
+	"  -x, --msg_tx_id <id>,   16-bit tx_id in payload bytes [0..1].\n"
 	"  -p, --tx_pwr <integer>, TX power (dBm). Default: 0 dBm.\n"
 	"  -m, --tx_mcs <integer>, TX MCS (integer). Default: 0.\n"
 	"  -t, --long_rd_id <id>,  Target long rd id. Default: 38.\n"
@@ -453,6 +454,7 @@ static const char dect_phy_mac_rach_tx_cmd_usage_str[] =
 
 /* Specifying the expected options (both long and short): */
 static struct option long_options_rach_tx[] = { {"data", required_argument, 0, 'd'},
+						{"msg_tx_id", required_argument, 0, 'x'},
 						{"tx_pwr", required_argument, 0, 'p'},
 						{"tx_mcs", required_argument, 0, 'm'},
 						{"long_rd_id", required_argument, 0, 't'},
@@ -502,6 +504,14 @@ static int dect_phy_mac_rach_tx_cmd(const struct shell *shell, size_t argc, char
 				return -EINVAL;
 			}
 			strcpy(params.tx_data_str, optarg);
+			break;
+		}
+		case 'x': {
+			params.tx_id = (uint16_t)shell_strtoul(optarg, 10, &ret);
+			if (ret) {
+				desh_error("Give valid msg tx id (0..65535)");
+				return -EINVAL;
+			}
 			break;
 		}
 		case 'p': {

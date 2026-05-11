@@ -64,10 +64,71 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // Flush pending data before closing
+  flushMasterOutput();
+  for (let i = 1; i <= NUM_SLAVES; i++) {
+    flushSlaveOutput(i);
+  }
+  flushSlaveEvents();
+  
+  // Close streams
+  tdmaStream.end();
+  slaveStream.end();
+  
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
+
+/* ===================== UI MESSAGE BATCHING ===================== */
+
+let masterOutputBatch = [];
+let slaveOutputBatches = {};
+const BATCH_SIZE = 50; // Send UI update every N lines
+const BATCH_TIMEOUT = 1000; // Or every 1 second
+
+function flushMasterOutput() {
+  if (masterOutputBatch.length === 0) return;
+  if (win) {
+    win.webContents.send('master-output-batch', masterOutputBatch);
+  }
+  masterOutputBatch = [];
+}
+
+function flushSlaveOutput(slaveNum) {
+  const slaveKey = `slave${slaveNum}`;
+  if (!slaveOutputBatches[slaveKey] || slaveOutputBatches[slaveKey].length === 0) return;
+  if (win) {
+    win.webContents.send(`slave${slaveNum}-output-batch`, slaveOutputBatches[slaveKey]);
+  }
+  slaveOutputBatches[slaveKey] = [];
+}
+
+// Set up periodic flush
+setInterval(() => {
+  flushMasterOutput();
+  for (let i = 1; i <= NUM_SLAVES; i++) {
+    flushSlaveOutput(i);
+  }
+}, BATCH_TIMEOUT);
+
+function addMasterOutput(line) {
+  masterOutputBatch.push(line);
+  if (masterOutputBatch.length >= BATCH_SIZE) {
+    flushMasterOutput();
+  }
+}
+
+function addSlaveOutput(slaveNum, line) {
+  const slaveKey = `slave${slaveNum}`;
+  if (!slaveOutputBatches[slaveKey]) {
+    slaveOutputBatches[slaveKey] = [];
+  }
+  slaveOutputBatches[slaveKey].push(line);
+  if (slaveOutputBatches[slaveKey].length >= BATCH_SIZE) {
+    flushSlaveOutput(slaveNum);
+  }
+}
 
 /* ===================== LOGGING ===================== */
 
@@ -181,26 +242,82 @@ function updateStatusUI() {
 // ===================== TDMA CSV LOGGER =====================
 
 const CSV_FILE = 'tdma.csv';
-
-// Create stream in append mode
+const SLAVE_EVENTS_FILE = 'slave_events.csv';
+// Create streams in append mode
 const tdmaStream = fs.createWriteStream(CSV_FILE, { flags: 'a' });
+const slaveStream = fs.createWriteStream(SLAVE_EVENTS_FILE, { flags: 'a' });
 
-// Write header only if file is new
+// Write headers only if CSV files are new
 if (!fs.existsSync(CSV_FILE) || fs.statSync(CSV_FILE).size === 0) {
   tdmaStream.write('frame_time,reset,seq,payload,tx_id\n');
 }
 
+if (!fs.existsSync(SLAVE_EVENTS_FILE) || fs.statSync(SLAVE_EVENTS_FILE).size === 0) {
+  slaveStream.write('timestamp,slave_num,event_type,master_id,tx_id,mcs,data\n');
+}
+
+// Slave data logging
+let slaveEventQueue = [];
+const SLAVE_FLUSH_INTERVAL = 5000; // Flush every 5 seconds
+
+function logSlaveEvent(slaveNum, eventType, data) {
+  slaveEventQueue.push({
+    timestamp: new Date().toISOString(),
+    slave_num: slaveNum,
+    event_type: eventType,
+    ...data
+  });
+}
+
+function flushSlaveEvents() {
+  if (slaveEventQueue.length === 0) return;
+  
+  slaveEventQueue.forEach(event => {
+    const { timestamp, slave_num, event_type, master_id = '', tx_id = '', mcs = '', data = '' } = event;
+    slaveStream.write(`"${timestamp}",${slave_num},"${event_type}",${master_id},${tx_id},${mcs},"${data}"\n`);
+  });
+  
+  slaveEventQueue = [];
+}
+
+setInterval(flushSlaveEvents, SLAVE_FLUSH_INTERVAL);
+
+
 // State machine for current PDC block
 let currentPdc = null;
+let pdcTimeout = null;
+const PDC_TIMEOUT = 1000; // Flush incomplete PDC after 1 second
+
+function flushCurrentPdc() {
+  if (currentPdc && (currentPdc.frame_time !== null)) {
+    // Write PDC even if tx_id is missing
+    writeTDMARow(currentPdc);
+  }
+  currentPdc = null;
+  if (pdcTimeout) {
+    clearTimeout(pdcTimeout);
+    pdcTimeout = null;
+  }
+}
 
 function processTDMALine(line) {
   let m;
 
+  // ---- Beacon TX callback ----
+  if ((m = line.match(/Beacon TX callback fired: frame_time=(\d+)/))) {
+    const beaconFrameTime = Number(m[1]);
+    // Write beacon to CSV with tx_id = 0 as marker
+    tdmaStream.write(
+      `${beaconFrameTime},beacon,0,0,0\n`
+    );
+    return;
+  }
+
   // ---- Start of new PDC ----
   if ((m = line.match(/PDC received at frame_time (\d+)/))) {
-    // flush previous incomplete (optional)
-    if (currentPdc && currentPdc.tx_id !== null) {
-      writeTDMARow(currentPdc);
+    // Flush previous PDC if still open
+    if (currentPdc) {
+      flushCurrentPdc();
     }
 
     currentPdc = {
@@ -210,6 +327,13 @@ function processTDMALine(line) {
       payload: null,
       tx_id: null
     };
+    
+    // Set timeout to flush this PDC if it doesn't complete
+    if (pdcTimeout) clearTimeout(pdcTimeout);
+    pdcTimeout = setTimeout(() => {
+      flushCurrentPdc();
+    }, PDC_TIMEOUT);
+    
     return;
   }
 
@@ -231,9 +355,9 @@ function processTDMALine(line) {
   else if ((m = line.match(/Tx id:\s*(\d+)/i))) {
     currentPdc.tx_id = Number(m[1]);
 
-    // ✅ finalize record when TX ID arrives
-    writeTDMARow(currentPdc);
-    currentPdc = null;
+    // Finalize record when TX ID arrives
+    if (pdcTimeout) clearTimeout(pdcTimeout);
+    flushCurrentPdc();
   }
 }
 
@@ -267,9 +391,7 @@ ipcMain.on('connect-master', (event, { port }) => {
       
       if (cleanLine.length > 0) {
         processTDMALine(cleanLine);
-        if (win) {
-          win.webContents.send('master-output', cleanLine);
-        }
+        addMasterOutput(cleanLine);
         
         // Parse beacon status
         if (cleanLine.toLowerCase().includes('beacon starting')) {
@@ -279,9 +401,6 @@ ipcMain.on('connect-master', (event, { port }) => {
           masterStatus = 'connected';
           updateStatusUI();
         }
-
-       
-       
       }
     }
   });
@@ -327,13 +446,8 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
 
         if (cleanLine.length === 0) continue;
 
-        // Send to UI
-        if (win) {
-          win.webContents.send(`slave${slaveNum}-output`, cleanLine);
-        }
-
-        // Optional debug
-        // log(`[SLAVE${slaveNum}] LINE: ${cleanLine}`);
+        // Send to UI (batched)
+        addSlaveOutput(slaveNum, cleanLine);
 
         /* ===================== BEACON SCAN PARSING ===================== */
         if (activeSlaveCommands[slaveKey] === 'beacon_scan') {
@@ -352,6 +466,9 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
           if (!isNaN(beaconTxId) && beaconTxId > 0) {
 
             log(`[SLAVE${slaveNum}] Extracted Beacon TX ID: ${beaconTxId}`);
+
+            // Log beacon scan result to CSV
+            logSlaveEvent(slaveNum, 'beacon_scan', { tx_id: beaconTxId });
 
             if (win) {
               win.webContents.send('beacon-scan-result', {
@@ -382,6 +499,13 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
 
               log(`[SLAVE${slaveNum}] Extracted TX ID (association): ${extractedTxId}`);
 
+              // Log association data to CSV
+              logSlaveEvent(slaveNum, 'association', {
+                master_id: slaveAssociationData[slaveKey].masterId || '',
+                tx_id: extractedTxId,
+                mcs: slaveAssociationData[slaveKey].mcs || ''
+              });
+
               if (win) {
                 win.webContents.send(
                   `association-info-${slaveNum}`,
@@ -395,6 +519,7 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
         /* ===================== STATUS PARSING ===================== */
         if (cleanLine.toLowerCase().includes('rx for association response completed')) {
           slaveStatuses[slaveKey] = 'associated';
+          logSlaveEvent(slaveNum, 'status_change', { data: 'associated' });
           updateStatusUI();
         } else if (cleanLine.toLowerCase().includes('association release')) {
           slaveStatuses[slaveKey] = 'connected';
@@ -406,6 +531,7 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
             timestamp: null
           };
 
+          logSlaveEvent(slaveNum, 'status_change', { data: 'connected' });
           updateStatusUI();
         }
       }
@@ -496,7 +622,27 @@ ipcMain.on('rach-tx-stop', (event, { slaveNum }) => {
 // Get available serial ports
 ipcMain.handle('list-ports', async () => {
   try {
-    const ports = await SerialPort.list();
+    let ports = await SerialPort.list();
+    
+    // Filter out duplicate tty/cu pairs on macOS (keep cu variant only)
+    const seenPorts = new Set();
+    ports = ports.filter(p => {
+      if (process.platform === 'darwin') {
+        // On macOS, /dev/tty.* and /dev/cu.* are the same physical port
+        // Keep only cu.* variant for cleaner display
+        const basePath = p.path.replace(/^\/dev\/tty\./, '/dev/cu.');
+        if (seenPorts.has(basePath)) {
+          return false; // Skip tty variant if we already have cu
+        }
+        seenPorts.add(basePath);
+        // Update the port path to use cu variant if it's currently tty
+        if (p.path.startsWith('/dev/tty.')) {
+          p.path = basePath;
+        }
+      }
+      return true;
+    });
+    
     return ports.map(p => ({
       port: p.path,
       manufacturer: p.manufacturer || 'Unknown',

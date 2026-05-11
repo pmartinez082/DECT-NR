@@ -357,7 +357,7 @@ static void dect_phy_mac_sdu_print(dect_phy_mac_sdu_t *sdu_list_item, int sdu_nb
 {
 	//desh_print("  SDU %u:", sdu_nbr);
 	dect_phy_mac_mux_header_print(&sdu_list_item->mux_header);
-	//dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
+	dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
 }
 
 bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)

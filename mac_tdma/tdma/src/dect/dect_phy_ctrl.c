@@ -551,7 +551,7 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 				params->pcc_status.header_status, tmp_str);
 			if (ctrl_data.debug) {
 				int16_t rssi_level = params->pcc_status.rssi_2 / 2;
-
+				/*
 				desh_print("PCC received (stf start time %llu, handle %d): "
 					   "status: \"%s\", snr %d, "
 					   "RSSI-2 %d (RSSI %d)",

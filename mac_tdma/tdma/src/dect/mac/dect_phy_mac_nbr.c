@@ -88,9 +88,16 @@ bool dect_phy_mac_nbr_info_store_n_update(uint64_t const *rcv_time, uint16_t cha
 					  bool print_update)
 {
 	bool done = true;
-	struct dect_phy_mac_nbr_info_list_item *nbr_ptr;
+	struct dect_phy_mac_nbr_info_list_item *nbr_ptr = NULL;
 
-	nbr_ptr = dect_phy_mac_nbr_info_get_by_long_rd_id(long_rd_id);
+	k_mutex_lock(&nbr_list_mutex, K_FOREVER);
+
+	for (int i = 0; i < DECT_PHY_MAC_MAX_NEIGBORS; i++) {
+		if (nbrs[i].reserved && nbrs[i].long_rd_id == long_rd_id) {
+			nbr_ptr = &nbrs[i];
+			break;
+		}
+	}
 
 	if (!nbr_ptr) {
 		/* Insert as a new one if there is room */
@@ -107,7 +114,18 @@ bool dect_phy_mac_nbr_info_store_n_update(uint64_t const *rcv_time, uint16_t cha
 			.time_rcvd_shift_mdm_ticks = 0,
 		};
 
-		if (!dect_phy_mac_nbr_info_store(nbr_info)) {
+		bool stored = false;
+
+		for (int i = 0; i < DECT_PHY_MAC_MAX_NEIGBORS; i++) {
+			if (!nbrs[i].reserved) {
+				nbrs[i] = nbr_info;
+				nbrs[i].reserved = true;
+				stored = true;
+				break;
+			}
+		}
+
+		if (!stored) {
 			desh_error("%s: cannot store scanning nbr result for long rd id %u",
 				   (__func__), long_rd_id);
 			done = false;

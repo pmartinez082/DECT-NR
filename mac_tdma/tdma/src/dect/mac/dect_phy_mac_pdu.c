@@ -872,6 +872,7 @@ dect_phy_mac_pdu_sdu_association_resp_encode(const dect_phy_mac_association_resp
 			*target_ptr++ = resp_in->group_id & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 			*target_ptr++ = resp_in->resource_tag & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 		}
+		*target_ptr++ = resp_in->assigned_slot_start;
 	}
 	return target_ptr;
 }
@@ -879,7 +880,8 @@ dect_phy_mac_pdu_sdu_association_resp_encode(const dect_phy_mac_association_resp
 static uint16_t dect_phy_mac_pdu_sdu_association_resp_length_get(
 	const dect_phy_mac_association_resp_t *resp)
 {
-	uint16_t length = DECT_PHY_MAC_ASSOCIATION_RESP_MIN_LEN;
+	/* ACK: flags + flow_id + assigned_slot_start */
+	uint16_t length = 3;
 
 	if (resp->harq_conf_bit) {
 		length += 2;
@@ -902,8 +904,13 @@ bool dect_phy_mac_pdu_sdu_association_resp_decode(const uint8_t *payload_ptr, ui
 	resp_out->ack_bit = (*payload_ptr >> 7) & DECT_COMMON_UTILS_BIT_MASK_1BIT;
 
 	if (!resp_out->ack_bit) {
+		/* NACK: byte0 flags, byte1 reject cause + time */
+		if (payload_len < 2) {
+			return false;
+		}
+		payload_ptr++;
 		resp_out->reject_cause = (*payload_ptr >> 4) & DECT_COMMON_UTILS_BIT_MASK_4BIT;
-		resp_out->reject_time = *payload_ptr++ & DECT_COMMON_UTILS_BIT_MASK_4BIT;
+		resp_out->reject_time = *payload_ptr & DECT_COMMON_UTILS_BIT_MASK_4BIT;
 
 		return true;
 	}
@@ -931,6 +938,7 @@ bool dect_phy_mac_pdu_sdu_association_resp_decode(const uint8_t *payload_ptr, ui
 		resp_out->group_id = *payload_ptr++ & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 		resp_out->resource_tag = *payload_ptr++ & DECT_COMMON_UTILS_BIT_MASK_7BIT;
 	}
+	resp_out->assigned_slot_start = *payload_ptr;
 	return true;
 }
 

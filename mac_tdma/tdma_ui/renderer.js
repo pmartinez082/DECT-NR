@@ -6,6 +6,16 @@ let beaconScanResults = {}; // { slave1: {...}, slave2: {...}, ... }
 
 const NUM_SLAVES = 2;
 
+// Helper function to limit output size (prevent memory bloat)
+function limitOutputSize(element, maxLines = 2000) {
+  if (element && element.textContent) {
+    const lines = element.textContent.split('\n');
+    if (lines.length > maxLines) {
+      element.textContent = lines.slice(-maxLines).join('\n');
+    }
+  }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   const debugLog = document.getElementById('debugLog');
 
@@ -33,7 +43,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       alert('Please select a port');
       return;
     }
-    
     ipcRenderer.send('connect-master', { port });
     masterConnected = true;
     updateMasterUI();
@@ -192,13 +201,30 @@ document.addEventListener('click', (e) => {
   ipcRenderer.on('debug-log', (_, msg) => {
     const timestamp = new Date().toLocaleTimeString();
     debugLog.textContent += `[${timestamp}] ${msg}\n`;
+    // Limit debug log size to prevent memory issues
+    const lines = debugLog.textContent.split('\n');
+    if (lines.length > 1000) {
+      debugLog.textContent = lines.slice(-1000).join('\n');
+    }
     debugLog.scrollTop = debugLog.scrollHeight;
   });
 
+  // Batched master output listener
+  ipcRenderer.on('master-output-batch', (_, dataArray) => {
+    const masterOutput = document.getElementById('master-output');
+    if (masterOutput && dataArray && dataArray.length > 0) {
+      masterOutput.textContent += dataArray.join('\n') + '\n';
+      limitOutputSize(masterOutput, 2000);
+      masterOutput.scrollTop = masterOutput.scrollHeight;
+    }
+  });
+
+  // Fallback for individual messages (for compatibility)
   ipcRenderer.on('master-output', (_, data) => {
     const masterOutput = document.getElementById('master-output');
     if (masterOutput && data) {
       masterOutput.textContent += data + '\n';
+      limitOutputSize(masterOutput, 2000);
       masterOutput.scrollTop = masterOutput.scrollHeight;
     }
   });
@@ -224,10 +250,22 @@ document.addEventListener('click', (e) => {
 });
   // Slave output listeners
   for (let slaveNum = 1; slaveNum <= NUM_SLAVES; slaveNum++) {
+    // Batched slave output listener
+    ipcRenderer.on(`slave${slaveNum}-output-batch`, (_, dataArray) => {
+      const slaveOutput = document.getElementById(`slave${slaveNum}-output`);
+      if (slaveOutput && dataArray && dataArray.length > 0) {
+        slaveOutput.textContent += dataArray.join('\n') + '\n';
+        limitOutputSize(slaveOutput, 2000);
+        slaveOutput.scrollTop = slaveOutput.scrollHeight;
+      }
+    });
+
+    // Fallback for individual messages (for compatibility)
     ipcRenderer.on(`slave${slaveNum}-output`, (_, data) => {
       const slaveOutput = document.getElementById(`slave${slaveNum}-output`);
       if (slaveOutput && data) {
         slaveOutput.textContent += data + '\n';
+        limitOutputSize(slaveOutput, 2000);
         slaveOutput.scrollTop = slaveOutput.scrollHeight;
       }
     });

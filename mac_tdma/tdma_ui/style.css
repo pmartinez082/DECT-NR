@@ -259,6 +259,16 @@ select {
   background-color: #7f8c8d;
 }
 
+/* Port Display (for hardcoded ports) */
+.port-display {
+  padding: 12px;
+  background-color: #ecf0f1;
+  border: 1px solid #bdc3c7;
+  border-radius: 5px;
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
 /* Buttons */
 .button-group {
   display: flex;
