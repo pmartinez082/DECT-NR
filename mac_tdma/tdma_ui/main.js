@@ -69,11 +69,9 @@ app.on('window-all-closed', () => {
   for (let i = 1; i <= NUM_SLAVES; i++) {
     flushSlaveOutput(i);
   }
-  flushSlaveEvents();
   
   // Close streams
   tdmaStream.end();
-  slaveStream.end();
   
   if (process.platform !== 'darwin') {
     app.quit();
@@ -242,45 +240,13 @@ function updateStatusUI() {
 // ===================== TDMA CSV LOGGER =====================
 
 const CSV_FILE = 'tdma.csv';
-const SLAVE_EVENTS_FILE = 'slave_events.csv';
-// Create streams in append mode
+// Create stream in append mode
 const tdmaStream = fs.createWriteStream(CSV_FILE, { flags: 'a' });
-const slaveStream = fs.createWriteStream(SLAVE_EVENTS_FILE, { flags: 'a' });
 
-// Write headers only if CSV files are new
+// Write header only if CSV file is new
 if (!fs.existsSync(CSV_FILE) || fs.statSync(CSV_FILE).size === 0) {
   tdmaStream.write('frame_time,reset,seq,payload,tx_id\n');
 }
-
-if (!fs.existsSync(SLAVE_EVENTS_FILE) || fs.statSync(SLAVE_EVENTS_FILE).size === 0) {
-  slaveStream.write('timestamp,slave_num,event_type,master_id,tx_id,mcs,data\n');
-}
-
-// Slave data logging
-let slaveEventQueue = [];
-const SLAVE_FLUSH_INTERVAL = 5000; // Flush every 5 seconds
-
-function logSlaveEvent(slaveNum, eventType, data) {
-  slaveEventQueue.push({
-    timestamp: new Date().toISOString(),
-    slave_num: slaveNum,
-    event_type: eventType,
-    ...data
-  });
-}
-
-function flushSlaveEvents() {
-  if (slaveEventQueue.length === 0) return;
-  
-  slaveEventQueue.forEach(event => {
-    const { timestamp, slave_num, event_type, master_id = '', tx_id = '', mcs = '', data = '' } = event;
-    slaveStream.write(`"${timestamp}",${slave_num},"${event_type}",${master_id},${tx_id},${mcs},"${data}"\n`);
-  });
-  
-  slaveEventQueue = [];
-}
-
-setInterval(flushSlaveEvents, SLAVE_FLUSH_INTERVAL);
 
 
 // State machine for current PDC block
@@ -467,9 +433,6 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
 
             log(`[SLAVE${slaveNum}] Extracted Beacon TX ID: ${beaconTxId}`);
 
-            // Log beacon scan result to CSV
-            logSlaveEvent(slaveNum, 'beacon_scan', { tx_id: beaconTxId });
-
             if (win) {
               win.webContents.send('beacon-scan-result', {
                 slaveNum,
@@ -499,13 +462,6 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
 
               log(`[SLAVE${slaveNum}] Extracted TX ID (association): ${extractedTxId}`);
 
-              // Log association data to CSV
-              logSlaveEvent(slaveNum, 'association', {
-                master_id: slaveAssociationData[slaveKey].masterId || '',
-                tx_id: extractedTxId,
-                mcs: slaveAssociationData[slaveKey].mcs || ''
-              });
-
               if (win) {
                 win.webContents.send(
                   `association-info-${slaveNum}`,
@@ -519,7 +475,6 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
         /* ===================== STATUS PARSING ===================== */
         if (cleanLine.toLowerCase().includes('rx for association response completed')) {
           slaveStatuses[slaveKey] = 'associated';
-          logSlaveEvent(slaveNum, 'status_change', { data: 'associated' });
           updateStatusUI();
         } else if (cleanLine.toLowerCase().includes('association release')) {
           slaveStatuses[slaveKey] = 'connected';
@@ -531,7 +486,6 @@ ipcMain.on('connect-slave', (event, { port, slaveNum }) => {
             timestamp: null
           };
 
-          logSlaveEvent(slaveNum, 'status_change', { data: 'connected' });
           updateStatusUI();
         }
       }
@@ -603,9 +557,9 @@ ipcMain.on('dissociate', (event, { slaveNum, masterId }) => {
 
 ipcMain.on('rach-tx-start', (event, { slaveNum, masterId, data, mcs, txPower, interval }) => {
   const slaveKey = `slave${slaveNum}`;
-  const cmd = interval 
-    ? `dect mac rach_tx -t ${masterId} -d "${data}" -j -m ${mcs} --tx_pwr ${txPower} -i ${interval}`
-    : `dect mac rach_tx -t ${masterId} -d "${data}" -m ${mcs} --tx_pwr ${txPower}`;
+  const cmd = interval != 0 
+    ? `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum} -i ${interval}`
+    : `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum}`;
   activeSlaveCommands[slaveKey] = 'rach_tx';
   log(`[SLAVE${slaveNum}] Starting RACH TX to master ${masterId}`);
   sendSerialCommand(slavePorts[slaveKey], cmd, `SLAVE${slaveNum}`);

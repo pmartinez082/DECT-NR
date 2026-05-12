@@ -493,7 +493,7 @@ static int dect_phy_mac_client_tdma_data_tx(
     uint64_t frame_duration = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
 
    
-    uint64_t first_possible = now + latency + guard + frame_duration;
+    uint64_t first_possible = now + latency + guard + frame_duration; 
 
     struct dect_phy_api_scheduler_list_item_config *conf;
 
@@ -520,15 +520,15 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     uint8_t frame_offset = tdma_client_state.assigned_slot_start /
         DECT_RADIO_FRAME_SLOT_COUNT;
-    uint8_t slot_in_frame = tdma_client_state.assigned_slot_start %
-        DECT_RADIO_FRAME_SLOT_COUNT;
+    uint8_t slot_in_frame = tdma_client_state.assigned_slot_start;
 
     uint64_t beacon_ref = target_nbr->time_rcvd_mdm_ticks;
     uint64_t beacon_age = (now >= beacon_ref) ? (now - beacon_ref) : 0;
 
-    if (beacon_age > (3 * beacon_interval_ticks)) {
+    
+    if (beacon_age > (20 * beacon_interval_ticks)) {
         dect_phy_api_scheduler_list_item_dealloc(item);
-        desh_warn("(%s): Beacon timing stale for TDMA (age=%llu ticks, interval=%llu ticks)",
+        desh_warn("(%s): Beacon timing too stale for TDMA (age=%llu ticks, interval=%llu ticks)",
                   __func__, beacon_age, beacon_interval_ticks);
         return -EAGAIN;
     }
@@ -545,7 +545,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         next_superframe_start = beacon_ref + (intervals * beacon_interval_ticks);
     }
 
-    
+   
     uint64_t tx_frame_time = next_superframe_start +
         ((uint64_t)(frame_offset) * frame_duration);
 
@@ -557,7 +557,7 @@ static int dect_phy_mac_client_tdma_data_tx(
     conf->start_slot = slot_in_frame;
     conf->length_slots = slot_count;
     conf->length_subslots = 0;
-    conf->interval_mdm_ticks = 0;
+    conf->interval_mdm_ticks = 0; // note: these are seconds. 
 
     conf->tx.phy_lbt_period = NRF_MODEM_DECT_LBT_PERIOD_MIN;
     conf->tx.phy_lbt_rssi_threshold_max =
@@ -574,16 +574,6 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     item->priority = DECT_PRIORITY1_TX;
     item->phy_op_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE;
-
-    uint64_t now2 = dect_app_modem_time_now();
-    uint64_t first_possible2 = now2 +
-        dect_phy_ctrl_modem_latency_for_next_op_get(true) + guard +
-        frame_duration +
-        MS_TO_MODEM_TICKS(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS / 4);
-
-    while (conf->frame_time < first_possible2) {
-        conf->frame_time += beacon_interval_ticks;
-    }
 
     if (!dect_phy_api_scheduler_list_item_add(item)) {
         dect_phy_api_scheduler_list_item_dealloc(item);

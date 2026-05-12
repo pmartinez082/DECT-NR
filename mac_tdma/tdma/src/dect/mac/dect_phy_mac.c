@@ -256,8 +256,9 @@ static void dect_phy_mac_message_print(dect_phy_mac_message_type_t message_type,
 		break;
 	}
 	case DECT_PHY_MAC_MESSAGE_PADDING: {
-		desh_print("      Received padding data, len %d, payload is not printed",
-			   message->common_msg.data_length);
+		/*desh_print("      Received padding data, len %d, payload is not printed",
+			   message->common_msg.data_length);*/
+			   
 		break;
 	}
 	case DECT_PHY_MAC_MESSAGE_ESCAPE: {
@@ -356,7 +357,7 @@ static void dect_phy_mac_mux_header_print(dect_phy_mac_mux_header_t *mux_header)
 static void dect_phy_mac_sdu_print(dect_phy_mac_sdu_t *sdu_list_item, int sdu_nbr)
 {
 	//desh_print("  SDU %u:", sdu_nbr);
-	dect_phy_mac_mux_header_print(&sdu_list_item->mux_header);
+	//dect_phy_mac_mux_header_print(&sdu_list_item->mux_header);
 	dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
 }
 

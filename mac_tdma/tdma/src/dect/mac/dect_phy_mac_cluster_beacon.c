@@ -71,7 +71,7 @@ static int find_free_slots(uint8_t needed_slots)
 	int start = -1;
 	int count = 0;
 
-	for (int i = 1; i < MAX_SLOTS-1; i++) { // blocking slot 0
+	for (int i = 6; i < MAX_SLOTS-1; i++) { // starting from slot 6 to avoid scheduling errors. 
 		if (global_slot_map.slots[i] == SLOT_FREE) {
 			if (start == -1) {
 				start = i;
