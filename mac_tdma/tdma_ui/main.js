@@ -7,11 +7,7 @@ const fs = require('fs');
 
 // Simple ANSI escape code stripper (replacement for strip-ansi)
 function stripAnsi(str) {
-  if (typeof str !== 'string') return str;
-  // Remove ANSI escape sequences: ESC [ ... m pattern
-  return str.replace(/\x1b\[[0-9;]*m/g, '')
-            .replace(/\x1b\[K/g, '')
-            .replace(/\x1b\[\?25[lh]/g, '');
+  return str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 }
 
 /* ===================== GLOBAL STATE ===================== */
@@ -245,7 +241,7 @@ const tdmaStream = fs.createWriteStream(CSV_FILE, { flags: 'a' });
 
 // Write header only if CSV file is new
 if (!fs.existsSync(CSV_FILE) || fs.statSync(CSV_FILE).size === 0) {
-  tdmaStream.write('frame_time,reset,seq,payload,tx_id\n');
+  tdmaStream.write('frame_time,reset,seq,tx_id\n');
 }
 
 
@@ -290,7 +286,6 @@ function processTDMALine(line) {
       frame_time: Number(m[1]),
       reset: null,
       seq: null,
-      payload: null,
       tx_id: null
     };
     
@@ -314,9 +309,6 @@ function processTDMALine(line) {
     currentPdc.seq = Number(m[1]);
   }
 
-  else if ((m = line.match(/Payload length:\s*(\d+)/i))) {
-    currentPdc.payload = Number(m[1]);
-  }
 
   else if ((m = line.match(/Tx id:\s*(\d+)/i))) {
     currentPdc.tx_id = Number(m[1]);
@@ -329,7 +321,7 @@ function processTDMALine(line) {
 
 function writeTDMARow(r) {
   tdmaStream.write(
-    `${r.frame_time},${r.reset},${r.seq},${r.payload},${r.tx_id}\n`
+    `${r.frame_time},${r.reset},${r.seq},${r.tx_id}\n`
   );
 }
 

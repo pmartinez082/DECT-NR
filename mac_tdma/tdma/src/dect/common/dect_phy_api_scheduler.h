@@ -13,6 +13,7 @@
 
 /* Following defines the time how much in advance is scheduled to modem */
 #define DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS 500
+
 #define DECT_PHY_API_SCHEDULER_OP_MAX_COUNT	 30
 
 #define DECT_SCHEDULER_DELAYED_ERROR		       6666

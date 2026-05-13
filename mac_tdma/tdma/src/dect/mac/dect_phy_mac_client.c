@@ -553,36 +553,54 @@ static int dect_phy_mac_client_tdma_data_tx(
         tx_frame_time += beacon_interval_ticks;
     }
 
-    conf->frame_time = tx_frame_time;
-    conf->start_slot = slot_in_frame;
-    conf->length_slots = slot_count;
-    conf->length_subslots = 0;
-    conf->interval_mdm_ticks = 0; // note: these are seconds. 
+    /*only 2 iterations for now*/
+    for (int tx_iteration = 0; tx_iteration < 2; tx_iteration++) {
+        struct dect_phy_api_scheduler_list_item_config *conf_iter;
+        struct dect_phy_api_scheduler_list_item *item_iter =
+            dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
 
-    conf->tx.phy_lbt_period = NRF_MODEM_DECT_LBT_PERIOD_MIN;
-    conf->tx.phy_lbt_rssi_threshold_max =
-        current_settings->rssi_scan.busy_threshold;
-    conf->tx.harq_feedback_requested = false;
+        if (!item_iter) {
+            return -ENOMEM;
+        }
 
-    item->sched_config.tx.encoded_payload_pdu_size = encoded_pdu_length;
-    memcpy(item->sched_config.tx.encoded_payload_pdu, encoded_data_to_send,
-           encoded_pdu_length);
+        /* 18 frames = 180ms between transmissions */
+        uint64_t iter_frame_time = tx_frame_time + (tx_iteration * frame_duration * 18);
 
-    item->sched_config.tx.header_type = DECT_PHY_HEADER_TYPE2;
-    memcpy(&item->sched_config.tx.phy_header.type_2, &phy_header.type_2,
-           sizeof(phy_header.type_2));
+        conf_iter->address_info.network_id = target_nbr->nw_id_32bit;
+        conf_iter->address_info.transmitter_long_rd_id =
+            current_settings->common.transmitter_id;
+        conf_iter->address_info.receiver_long_rd_id = params->target_long_rd_id;
+        conf_iter->channel = target_nbr->channel;
+        conf_iter->frame_time = iter_frame_time;
+        conf_iter->start_slot = slot_in_frame;
+        conf_iter->length_slots = slot_count;
+        conf_iter->length_subslots = 0;
+        conf_iter->interval_mdm_ticks = 0;
 
-    item->priority = DECT_PRIORITY1_TX;
-    item->phy_op_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE;
+        conf_iter->tx.phy_lbt_period = NRF_MODEM_DECT_LBT_PERIOD_MIN;
+        conf_iter->tx.phy_lbt_rssi_threshold_max =
+            current_settings->rssi_scan.busy_threshold;
+        conf_iter->tx.harq_feedback_requested = false;
 
-    if (!dect_phy_api_scheduler_list_item_add(item)) {
-        dect_phy_api_scheduler_list_item_dealloc(item);
-        return -EBUSY;
+        item_iter->sched_config.tx.encoded_payload_pdu_size = encoded_pdu_length;
+        memcpy(item_iter->sched_config.tx.encoded_payload_pdu, encoded_data_to_send,
+               encoded_pdu_length);
+
+        item_iter->sched_config.tx.header_type = DECT_PHY_HEADER_TYPE2;
+        memcpy(&item_iter->sched_config.tx.phy_header.type_2, &phy_header.type_2,
+               sizeof(phy_header.type_2));
+
+        item_iter->priority = DECT_PRIORITY1_TX;
+        item_iter->phy_op_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE + tx_iteration;
+
+        if (!dect_phy_api_scheduler_list_item_add(item_iter)) {
+            dect_phy_api_scheduler_list_item_dealloc(item_iter);
+            return -EBUSY;
+        }
+
+        desh_print("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u", 
+                   tx_iteration, conf_iter->start_slot, iter_frame_time, encoded_pdu_length);
     }
-
-    desh_print("TDMA TX scheduled slot=%u frame=%llu len=%u (beacon_age_ms=%llu)",
-               conf->start_slot, conf->frame_time, encoded_pdu_length,
-               MODEM_TICKS_TO_MS(beacon_age));
 
     return 0;
 }
