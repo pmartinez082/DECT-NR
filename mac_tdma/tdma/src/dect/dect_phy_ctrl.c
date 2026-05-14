@@ -40,6 +40,9 @@ K_THREAD_STACK_DEFINE(dect_phy_ctrl_th_stack, DECT_PHY_CTRL_STACK_SIZE);
 
 struct k_work_q dect_phy_ctrl_work_q;
 
+
+
+
 /* States of all commands */
 static struct dect_phy_ctrl_data {
 	bool phy_api_initialized;
@@ -603,6 +606,18 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 				struct nrf_modem_dect_phy_pdc_event *p_rx_status =
 					&(params->rx_status);
 				int16_t rssi_level = p_rx_status->rssi_2 / 2;
+				/*struct frame_time_stats stats;
+				if (stats.pdc_received_frame_time_count >= 64) {
+					desh_print("STATS so far:");
+					for (int i = 0; i < 64; i++) {
+						desh_print(" %llu", stats.pdc_received_frame_time[i]);
+					}
+				}
+				uint64_t frame_count = stats.pdc_received_frame_time_count;
+				stats.pdc_received_frame_time[frame_count] = params->time;
+				stats.pdc_received_frame_time_count++;
+
+				*/
 				desh_print("PDC received at frame_time %llu", params->time);
 				/*
 				desh_print("PDC received (time %llu): snr %d, RSSI-2 %d "

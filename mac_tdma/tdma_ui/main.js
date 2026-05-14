@@ -67,7 +67,7 @@ app.on('window-all-closed', () => {
   }
   
   // Close streams
-  tdmaStream.end();
+  masterLogStream.end();
   
   if (process.platform !== 'darwin') {
     app.quit();
@@ -233,97 +233,11 @@ function updateStatusUI() {
 }
 
 
-// ===================== TDMA CSV LOGGER =====================
+// ===================== TDMA TEXT LOGGER =====================
 
-const CSV_FILE = 'tdma.csv';
+const MASTER_LOG_FILE = 'master_output.txt';
 // Create stream in append mode
-const tdmaStream = fs.createWriteStream(CSV_FILE, { flags: 'a' });
-
-// Write header only if CSV file is new
-if (!fs.existsSync(CSV_FILE) || fs.statSync(CSV_FILE).size === 0) {
-  tdmaStream.write('frame_time,reset,seq,tx_id\n');
-}
-
-
-// State machine for current PDC block
-let currentPdc = null;
-let pdcTimeout = null;
-const PDC_TIMEOUT = 1000; // Flush incomplete PDC after 1 second
-
-function flushCurrentPdc() {
-  if (currentPdc && (currentPdc.frame_time !== null)) {
-    // Write PDC even if tx_id is missing
-    writeTDMARow(currentPdc);
-  }
-  currentPdc = null;
-  if (pdcTimeout) {
-    clearTimeout(pdcTimeout);
-    pdcTimeout = null;
-  }
-}
-
-function processTDMALine(line) {
-  let m;
-
-  // ---- Beacon TX callback ----
-  if ((m = line.match(/Beacon TX callback fired: frame_time=(\d+)/))) {
-    const beaconFrameTime = Number(m[1]);
-    // Write beacon to CSV with tx_id = 0 as marker
-    tdmaStream.write(
-      `${beaconFrameTime},beacon,0,0,0\n`
-    );
-    return;
-  }
-
-  // ---- Start of new PDC ----
-  if ((m = line.match(/PDC received at frame_time (\d+)/))) {
-    // Flush previous PDC if still open
-    if (currentPdc) {
-      flushCurrentPdc();
-    }
-
-    currentPdc = {
-      frame_time: Number(m[1]),
-      reset: null,
-      seq: null,
-      tx_id: null
-    };
-    
-    // Set timeout to flush this PDC if it doesn't complete
-    if (pdcTimeout) clearTimeout(pdcTimeout);
-    pdcTimeout = setTimeout(() => {
-      flushCurrentPdc();
-    }, PDC_TIMEOUT);
-    
-    return;
-  }
-
-  if (!currentPdc) return;
-
-  // ---- Fields ----
-  if ((m = line.match(/Reset:\s*(\w+)/i))) {
-    currentPdc.reset = m[1];
-  }
-
-  else if ((m = line.match(/Seq Nbr:\s*(\d+)/i))) {
-    currentPdc.seq = Number(m[1]);
-  }
-
-
-  else if ((m = line.match(/Tx id:\s*(\d+)/i))) {
-    currentPdc.tx_id = Number(m[1]);
-
-    // Finalize record when TX ID arrives
-    if (pdcTimeout) clearTimeout(pdcTimeout);
-    flushCurrentPdc();
-  }
-}
-
-function writeTDMARow(r) {
-  tdmaStream.write(
-    `${r.frame_time},${r.reset},${r.seq},${r.tx_id}\n`
-  );
-}
+const masterLogStream = fs.createWriteStream(MASTER_LOG_FILE, { flags: 'a' });
 
 /* ===================== IPC HANDLERS ===================== */
 
@@ -348,7 +262,8 @@ ipcMain.on('connect-master', (event, { port }) => {
       const cleanLine = stripAnsi(rawLine).trim();
       
       if (cleanLine.length > 0) {
-        processTDMALine(cleanLine);
+        // Write to master log file
+        masterLogStream.write(cleanLine + '\n');
         addMasterOutput(cleanLine);
         
         // Parse beacon status
