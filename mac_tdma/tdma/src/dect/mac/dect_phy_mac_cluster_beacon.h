@@ -20,7 +20,7 @@
 
 /* 'Validity' is random access allocation length in frames */
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_VALIDITY                                                    \
-	((DECT_PHY_MAC_CLUSTER_BEACON_INTERVAL_MS / DECT_RADIO_FRAME_DURATION_MS) / 2)
+	(DECT_PHY_MAC_CLUSTER_BEACON_INTERVAL_MS / DECT_RADIO_FRAME_DURATION_MS)
 
 /* 'repetition' in every 2nd frame */
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_REPETITION (2)

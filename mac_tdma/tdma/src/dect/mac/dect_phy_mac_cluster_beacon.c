@@ -215,8 +215,12 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 /* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
  * resources. Scheduling a large validity window (e.g., 100 frames) can result
  * in dozens of RX ops being allocated which may exceed modem capacity.
+ *
+ * At 2-frame repetition, the full 200-frame validity window requires 101
+ * receive windows. The previous limit of 17 only covered the first 0..32
+ * frames, which is why later transmissions were missed.
  */
-#define MAX_RACH_RX_ITEMS 16
+#define MAX_RACH_RX_ITEMS 101
 
 
 
@@ -615,9 +619,8 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		rach_frame_time + (DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS *
 				   DECT_PHY_MAC_CLUSTER_BEACON_RA_VALIDITY);
 
+	int rach_items_count = 0;
 	while (rach_frame_time <= last_valid_rach_rx_frame_time) {
-		static int rach_items_count = 0;
-
 		if (rach_items_count >= MAX_RACH_RX_ITEMS) {
 			/* Stop adding more RX items to avoid exhausting modem resources */
 			break;
@@ -679,6 +682,7 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		}
 	}
 
+	printk("Scheduled %d RACH RX windows for beacon validity", rach_items_count);
 	beacon_data.running = true;
 
 	printk("Scheduled beacon TX: "

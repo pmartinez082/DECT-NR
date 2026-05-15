@@ -198,7 +198,7 @@ static int dect_phy_mac_client_data_pdu_encode(
         DECT_PHY_MAC_DLC_IE_TYPE_SERV_0_WITHOUT_ROUTING;
 
     /* Limit payload size aggressively */
-	uint16_t payload_len = MIN(available_payload, 16);
+	uint16_t payload_len = MIN(available_payload, 8);
 
 	data_sdu->message.data_sdu.data_length =
 		payload_len;
@@ -461,7 +461,7 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     union nrf_modem_dect_phy_hdr phy_header;
 
-    uint8_t encoded_data_to_send[64];
+    uint8_t encoded_data_to_send[8];
     uint8_t *pdu_ptr = encoded_data_to_send;
 
     memset(encoded_data_to_send, 0, sizeof(encoded_data_to_send));
@@ -493,27 +493,11 @@ static int dect_phy_mac_client_tdma_data_tx(
     uint64_t frame_duration = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
 
    
-    uint64_t first_possible = now + latency + guard + frame_duration; 
-
-    struct dect_phy_api_scheduler_list_item_config *conf;
-
-    struct dect_phy_api_scheduler_list_item *item =
-        dect_phy_api_scheduler_list_item_alloc_tx_element(&conf);
-
-    if (!item) {
-        return -ENOMEM;
-    }
-
-    conf->address_info.network_id = target_nbr->nw_id_32bit;
-    conf->address_info.transmitter_long_rd_id =
-        current_settings->common.transmitter_id;
-    conf->address_info.receiver_long_rd_id = params->target_long_rd_id;
-    conf->channel = target_nbr->channel;
+    uint64_t first_possible = now + latency + guard + frame_duration;
 
     int32_t beacon_interval_ms = dect_phy_mac_pdu_cluster_beacon_period_in_ms(
         target_nbr->beacon_msg.cluster_beacon_period);
     if (beacon_interval_ms <= 0) {
-        dect_phy_api_scheduler_list_item_dealloc(item);
         return -EINVAL;
     }
     uint64_t beacon_interval_ticks = MS_TO_MODEM_TICKS(beacon_interval_ms);
@@ -527,7 +511,6 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     
     if (beacon_age > (20 * beacon_interval_ticks)) {
-        dect_phy_api_scheduler_list_item_dealloc(item);
         desh_warn("(%s): Beacon timing too stale for TDMA (age=%llu ticks, interval=%llu ticks)",
                   __func__, beacon_age, beacon_interval_ticks);
         return -EAGAIN;
@@ -553,8 +536,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         tx_frame_time += beacon_interval_ticks;
     }
 
-    /*only 2 iterations for now*/
-    for (int tx_iteration = 0; tx_iteration < 2; tx_iteration++) {
+    for (int tx_iteration = 0; tx_iteration < 10; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
             dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
@@ -563,8 +545,8 @@ static int dect_phy_mac_client_tdma_data_tx(
             return -ENOMEM;
         }
 
-        /* 18 frames = 180ms between transmissions */
-        uint64_t iter_frame_time = tx_frame_time + (tx_iteration * frame_duration * 18);
+        
+        uint64_t iter_frame_time = tx_frame_time + (tx_iteration * frame_duration);
 
         conf_iter->address_info.network_id = target_nbr->nw_id_32bit;
         conf_iter->address_info.transmitter_long_rd_id =
