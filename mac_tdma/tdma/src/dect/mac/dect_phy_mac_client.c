@@ -274,12 +274,10 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 	}
 	bool our_beacon_is_running = dect_phy_mac_cluster_beacon_is_running();
 
-	if (our_beacon_is_running) {
-		/* If our beacon is running, send beyond the window to get the priority over others.
-		 * This adds more delay to TX but is more reliable to avoid scheduling collisions.
-		 */
-		first_possible_tx += MS_TO_MODEM_TICKS(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS);
-	}
+	/* Do not blindly add the scheduler window delay. We prefer to delay only when
+	 * it won't push the computed RACH TX beyond the last valid RACH RX frame time.
+	 * Compute beacon interval first and decide below.
+	 */
 
 	beacon_interval_mdm_ticks = MS_TO_MODEM_TICKS(beacon_interval_ms);
 
@@ -305,6 +303,17 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 		last_valid_rach_rx_frame_time =
 			next_beacon_frame_start +
 			(target_nbr->ra_ie.validity * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
+	}
+
+	/* Apply optional additional delay for our beacon only if it doesn't
+	 * push the TX beyond the last valid RACH RX frame time. This keeps
+	 * RACH transmissions inside the scheduled RX windows on the beacon.
+	 */
+	if (our_beacon_is_running) {
+		uint64_t temp_fp = first_possible_tx + MS_TO_MODEM_TICKS(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS);
+		if (temp_fp <= last_valid_rach_rx_frame_time) {
+			first_possible_tx = temp_fp;
+		}
 	}
 
 	/* .... and after the last client TX */
@@ -536,7 +545,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         tx_frame_time += beacon_interval_ticks;
     }
 
-    for (int tx_iteration = 0; tx_iteration < 10; tx_iteration++) {
+    for (int tx_iteration = 0; tx_iteration < 200; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
             dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
@@ -1357,6 +1366,8 @@ int dect_phy_mac_client_dissociate(struct dect_phy_mac_nbr_info_list_item *targe
 	association_data->state = DECT_PHY_MAC_CLIENT_ASSOCIATION_STATE_DISASSOCIATED;
 	association_data->target_nbr = NULL;
 	association_data->target_long_rd_id = 0;
+
+	
 
 	err = dect_phy_mac_client_dissociate_msg_send(target_nbr, params);
 	if (err) {

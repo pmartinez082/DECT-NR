@@ -16,6 +16,7 @@
 /* Defines for Random Access Resource IE */
 
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_START_SUBSLOT (12) /* Only even numbers */
+
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS  (10)
 
 /* 'Validity' is random access allocation length in frames */

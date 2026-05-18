@@ -12,7 +12,7 @@
 #include "dect_phy_common.h"
 
 /* Following defines the time how much in advance is scheduled to modem */
-#define DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS 500
+#define DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS 200
 
 #define DECT_PHY_API_SCHEDULER_OP_MAX_COUNT	 30
 

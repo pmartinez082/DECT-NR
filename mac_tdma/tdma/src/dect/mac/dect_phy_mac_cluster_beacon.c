@@ -213,16 +213,9 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 } lms_rssi_scan_data;
 
 /* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
- * resources. Scheduling a large validity window (e.g., 100 frames) can result
- * in dozens of RX ops being allocated which may exceed modem capacity.
- *
- * At 2-frame repetition, the full 200-frame validity window requires 101
- * receive windows. The previous limit of 17 only covered the first 0..32
- * frames, which is why later transmissions were missed.
+ * resources.
  */
-#define MAX_RACH_RX_ITEMS 101
-
-
+#define MAX_RACH_RX_ITEMS 90
 
 
 static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void);

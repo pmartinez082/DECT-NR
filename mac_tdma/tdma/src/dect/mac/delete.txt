@@ -1,0 +1,102 @@
+PDC received at frame_time 2505283000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2506665400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2508047800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2509430200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2510812600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2512195000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2513577400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2514959800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2516342200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2517724600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2519107000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2520489400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2521871800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2523254200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2524636600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2526019000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2527401400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2528783800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2530166200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2531548600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2532931000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2534313400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2535695800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2537078200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2538460600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2539843000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2541225400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2542607800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2543990200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2545372600
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2546755000
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2548137400
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2549519800
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
+PDC received at frame_time 2550902200
+      Seq Nbr: 1
+Tx id: 5678 (0x162e)
