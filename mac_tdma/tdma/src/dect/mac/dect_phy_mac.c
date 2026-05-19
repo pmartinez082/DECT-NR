@@ -291,9 +291,9 @@ static void dect_phy_mac_message_print(dect_phy_mac_message_type_t message_type,
 }
 static void dect_phy_mac_print_tdma_info(
 					     dect_phy_mac_common_header_t *common_header, 
-					 uint64_t stf){
+					 uint64_t time){
 
-		desh_print("PDC received at frame_time %llu", stf);
+		desh_print("PDC received at frame_time %f", MODEM_TICKS_TO_MS(time));
 	
 	
 

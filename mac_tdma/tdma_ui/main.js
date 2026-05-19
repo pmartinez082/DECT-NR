@@ -436,7 +436,7 @@ ipcMain.on('beacon-scan', (event, { channel, slaveNum }) => {
 
   const cmd = `dect mac beacon_scan -c ${channel}`;
 
-  activeSlaveCommands[slaveKey] = 'beacon_scan'; // ✅ FIX
+  activeSlaveCommands[slaveKey] = 'beacon_scan'; //  FIX
 
   log(`[SLAVE${slaveNum}] Starting beacon scan on channel ${channel}`);
 
