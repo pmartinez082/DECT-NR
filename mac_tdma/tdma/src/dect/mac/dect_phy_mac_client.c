@@ -545,7 +545,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         tx_frame_time += beacon_interval_ticks;
     }
 
-    for (int tx_iteration = 0; tx_iteration < 66; tx_iteration++) {
+    for (int tx_iteration = 0; tx_iteration < 50; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
             dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
@@ -555,7 +555,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         }
 
         
-        uint64_t iter_frame_time = tx_frame_time + 2*(tx_iteration * frame_duration);
+        uint64_t iter_frame_time = tx_frame_time + 4*(tx_iteration * frame_duration);
 
         conf_iter->address_info.network_id = target_nbr->nw_id_32bit;
         conf_iter->address_info.transmitter_long_rd_id =

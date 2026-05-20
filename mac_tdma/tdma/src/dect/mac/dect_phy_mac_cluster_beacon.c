@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -33,7 +34,7 @@
 #define MAX_SLOTS 24  /* number of logical TDMA slots */
 #define SLOT_FREE 0
 #define SLOT_RESERVED 1
-extern struct k_work_q dect_phy_ctrl_work_q;
+
 struct dect_phy_mac_slot_map {
 	uint8_t slots[MAX_SLOTS]; /* 0 = free, 1 = reserved */
 	
@@ -70,10 +71,8 @@ static int find_free_slots(uint8_t needed_slots)
 {
 	int start = -1;
 	int count = 0;
-// In find_free_slots, change start index:
-// RACH starts at subslot 12, length 10 slots -> ends at slot 3+10=13
-// So start TDMA allocation at slot 14 to be safe
-	for (int i = 14; i < MAX_SLOTS - 1; i++) {
+
+	for (int i = 6; i < MAX_SLOTS-1; i++) { // starting from slot 6 to avoid scheduling errors. 
 		if (global_slot_map.slots[i] == SLOT_FREE) {
 			if (start == -1) {
 				start = i;
@@ -137,83 +136,6 @@ static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
 
 /*----------------------------------------------------------------------------*/
 /* Server-side TDMA scheduling: unicast per associated client */
-/*
-static void cluster_schedule_tdma(uint64_t superframe_start_time)
-
-{
-    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-    uint32_t rx_op_handle_base = 6000;
-
-    //Remove previous cycle's RX items before rescheduling 
-    for (int c = 0; c < MAX_CLIENTS; c++) {
-        dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
-            rx_op_handle_base + c);
-    }
-
-    for (int c = 0; c < associated_clients_count; c++) {
-        struct dect_phy_mac_client_info *client = &associated_clients[c];
-
-        if (client->assigned_slot_start == 0xFFU) {
-            continue;
-        }
-
-        uint8_t frame_offset = client->assigned_slot_start / DECT_RADIO_FRAME_SLOT_COUNT;
-        uint8_t slot_in_frame = client->assigned_slot_start % DECT_RADIO_FRAME_SLOT_COUNT;
-
-        uint64_t first_rx_frame_time = superframe_start_time +
-            (frame_offset * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
-
-       
-            struct dect_phy_api_scheduler_list_item_config *rx_conf;
-            struct dect_phy_api_scheduler_list_item *rx_item =
-                dect_phy_api_scheduler_list_item_alloc_rx_element(&rx_conf);
-
-            if (!rx_item) {
-                desh_error("TDMA RX alloc failed for client %u",
-                           client->client_id);
-                break;
-            }
-
-            rx_conf->channel = beacon_data.start_params.beacon_channel;
-            rx_conf->frame_time = first_rx_frame_time;
-            rx_conf->start_slot = slot_in_frame;
-            rx_conf->length_slots = client->num_slots_needed;
-            rx_conf->length_subslots = 0;
-	        rx_conf->interval_mdm_ticks = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
-
-
-
-            rx_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS;
-			rx_conf->rx.duration = client->num_slots_needed * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
-            rx_conf->rx.expected_rssi_level = current_settings->rx.expected_rssi_level;
-            rx_conf->rx.network_id = current_settings->common.network_id;
-
-            rx_conf->rx.filter.is_short_network_id_used = true;
-            rx_conf->rx.filter.short_network_id =
-                (uint8_t)(current_settings->common.network_id & 0xFF);
-            rx_conf->rx.filter.receiver_identity = current_settings->common.short_rd_id;
-
-            rx_item->priority = DECT_PRIORITY2_RX;
-            
-            rx_item->phy_op_handle = rx_op_handle_base;
-
-            if (!dect_phy_api_scheduler_list_item_add(rx_item)) {
-                desh_error("TDMA RX schedule failed for client %u",
-                           client->client_id);
-                dect_phy_api_scheduler_list_item_dealloc(rx_item);
-                break;
-            }
-        
-
-        printk("Scheduled 200 RX windows for client %u at slot %u",
-               client->client_id, slot_in_frame);
-    }
-}
-
-*/
-
-
-/* Server-side TDMA scheduling: unicast per associated client */
 
 static void cluster_schedule_tdma(uint64_t superframe_start_time)
 {
@@ -268,7 +190,6 @@ static void cluster_schedule_tdma(uint64_t superframe_start_time)
 	}
 }
 
-
 /* Work item to defer TDMA scheduling out of ISR context */
 static void tdma_schedule_work_handler(struct k_work *work)
 {
@@ -295,7 +216,7 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 /* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
  * resources.
  */
-#define MAX_RACH_RX_ITEMS 5
+#define MAX_RACH_RX_ITEMS 90
 
 
 static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void);
@@ -521,12 +442,12 @@ static void dect_phy_mac_cluster_beacon_to_mdm_cb(
 		beacon_data.last_tx_frame_time = frame_time;
 
 		/* Print current frame_time */
-		printk("Beacon TX callback fired: frame_time=%f\n", MODEM_TICKS_TO_MS(frame_time));
+		printk("Beacon TX callback fired: frame_time=%llu\n", frame_time);
 
-		/* Submit TDMA scheduling to work queue (safe from ISR context) */
-		// TODO: only when associated (si no peta)
-       // k_work_submit_to_queue(&dect_phy_ctrl_work_q, &tdma_schedule_work);
-		
+		/* TDMA scheduling temporarily disabled to avoid ISR mutex use.
+		 * It can be re‑enabled by submitting tdma_schedule_work from
+		 * thread context instead of this modem callback.
+		 */
 	}
 }
 uint64_t dect_phy_mac_cluster_beacon_last_tx_frame_time_get(void)
@@ -721,11 +642,10 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		 * resources which can result in NRF_MODEM_DECT_PHY_ERR_NO_MEMORY. The
 		 * scheduler will repeat the RX per interval as configured.
 		 */
-		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_SINGLE_SHOT;
+		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS;
 		rach_list_item_conf->rx.expected_rssi_level =
 			current_settings->rx.expected_rssi_level;
-		rach_list_item_conf->rx.duration =
-			0; /* length_slots used instead duration variable */
+		rach_list_item_conf->length_slots = DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS;
 		rach_list_item_conf->rx.network_id = current_settings->common.network_id;
 
 		/* Only receive the ones destinated to this beacon: */
@@ -774,10 +694,6 @@ static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void)
 		DECT_PHY_MAC_BEACON_TX_HANDLE);
 	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle_range(
 		DECT_PHY_MAC_BEACON_RX_RACH_HANDLE_START, DECT_PHY_MAC_BEACON_RX_RACH_HANDLE_END);
-
-	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle_range(
-    DECT_PHY_MAC_BEACON_RX_TDMA_HANDLE_START,
-    DECT_PHY_MAC_BEACON_RX_TDMA_HANDLE_START + MAX_CLIENTS - 1);
 }
 
 void dect_phy_mac_cluster_beacon_tx_stop(void)
@@ -885,8 +801,6 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 		
 	};
 
-
-	/* TODO: The client needs to know the assigned slot  */
 	data_sdu_list_item->mux_header = mux_header1;
 	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_ASSOCIATION_RESP;
 	data_sdu_list_item->message.association_resp = association_resp;
@@ -969,61 +883,6 @@ void dect_phy_mac_cluster_beacon_association_req_handle(
         associated_clients[associated_clients_count] = *assigned_client;
         associated_clients_count++;
     }
-
-
-	if (assigned_client != NULL && associated_clients_count < MAX_CLIENTS) {
-    associated_clients[associated_clients_count] = *assigned_client;
-    int c = associated_clients_count;
-    associated_clients_count++;
-
-    /* Schedule dedicated repeating RX for this client's uplink slot */
-    struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-    struct dect_phy_mac_client_info *client = &associated_clients[c];
-    uint8_t slot_in_frame = client->assigned_slot_start % DECT_RADIO_FRAME_SLOT_COUNT;
-
-    struct dect_phy_api_scheduler_list_item_config *tdma_rx_conf;
-    struct dect_phy_api_scheduler_list_item *tdma_rx_item =
-        dect_phy_api_scheduler_list_item_alloc_rx_element(&tdma_rx_conf);
-
-    if (tdma_rx_item) {
-        tdma_rx_conf->channel = beacon_data.start_params.beacon_channel;
-        /* Start from next frame after last beacon TX */
-        tdma_rx_conf->frame_time = beacon_data.last_tx_frame_time +
-            DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
-        tdma_rx_conf->start_slot = slot_in_frame;
-        tdma_rx_conf->length_slots = client->num_slots_needed;
-        tdma_rx_conf->length_subslots = 0;
-        /* Repeat every frame so we catch every client transmission */
-        tdma_rx_conf->interval_mdm_ticks = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
-
-        tdma_rx_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_SINGLE_SHOT;
-        tdma_rx_conf->rx.expected_rssi_level = current_settings->rx.expected_rssi_level;
-        tdma_rx_conf->rx.duration = 0;
-        tdma_rx_conf->rx.network_id = current_settings->common.network_id;
-
-        tdma_rx_conf->rx.filter.is_short_network_id_used = true;
-        tdma_rx_conf->rx.filter.short_network_id =
-            (uint8_t)(current_settings->common.network_id & 0xFF);
-        tdma_rx_conf->rx.filter.receiver_identity =
-            current_settings->common.short_rd_id;
-
-        tdma_rx_item->priority = DECT_PRIORITY2_RX;
-        tdma_rx_item->phy_op_handle = DECT_PHY_MAC_BEACON_RX_TDMA_HANDLE_START + c;
-
-        if (!dect_phy_api_scheduler_list_item_add(tdma_rx_item)) {
-            desh_error("TDMA RX schedule failed for client %u", client->client_id);
-            dect_phy_api_scheduler_list_item_dealloc(tdma_rx_item);
-        } else {
-            printk("Scheduled repeating TDMA RX for client %u at slot %u",
-                   client->client_id, slot_in_frame);
-        }
-    }
-}
-
-
-
-
-
 
     printk("Handling Association Req from client %u (0x%04x), needed mcs %d, needed slots %d. Assigned slot start: %d\n",
 		   common_header->transmitter_id, common_header->transmitter_id, association_req->needed_mcs,
