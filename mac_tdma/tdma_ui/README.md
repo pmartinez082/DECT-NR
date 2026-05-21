@@ -90,10 +90,10 @@ dect mac associate -t <masterId> -m <mcs>
 # Dissociate from master
 dect mac dissociate -t <masterId>
 
-# Send single RACH TX
+# Send single TDMA TX
 dect mac rach_tx -t <masterId> -d "<data>" -m <mcs> --tx_pwr <power>
 
-# Send periodic RACH TX (interval in seconds)
+# Send periodic TDMA TX (interval in seconds)
 dect mac rach_tx -t <masterId> -d "<data>" -j -m <mcs> --tx_pwr <power> -i <interval>
 
 # Stop RACH TX

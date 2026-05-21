@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2024 Nordic Semiconductor ASA
  *
@@ -641,11 +642,10 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 		 * resources which can result in NRF_MODEM_DECT_PHY_ERR_NO_MEMORY. The
 		 * scheduler will repeat the RX per interval as configured.
 		 */
-		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_SINGLE_SHOT;
+		rach_list_item_conf->rx.mode = NRF_MODEM_DECT_PHY_RX_MODE_CONTINUOUS;
 		rach_list_item_conf->rx.expected_rssi_level =
 			current_settings->rx.expected_rssi_level;
-		rach_list_item_conf->rx.duration =
-			0; /* length_slots used instead duration variable */
+		rach_list_item_conf->length_slots = DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS;
 		rach_list_item_conf->rx.network_id = current_settings->common.network_id;
 
 		/* Only receive the ones destinated to this beacon: */
@@ -801,8 +801,6 @@ static int dect_phy_mac_cluster_beacon_association_resp_pdu_encode(
 		
 	};
 
-
-	/* TODO: The client needs to know the assigned slot  */
 	data_sdu_list_item->mux_header = mux_header1;
 	data_sdu_list_item->message_type = DECT_PHY_MAC_MESSAGE_TYPE_ASSOCIATION_RESP;
 	data_sdu_list_item->message.association_resp = association_resp;

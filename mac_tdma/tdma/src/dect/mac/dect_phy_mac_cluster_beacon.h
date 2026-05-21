@@ -17,7 +17,7 @@
 
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_START_SUBSLOT (12) /* Only even numbers */
 
-#define DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS  (10)
+#define DECT_PHY_MAC_CLUSTER_BEACON_RA_LENGTH_SLOTS  (18)
 
 /* 'Validity' is random access allocation length in frames */
 #define DECT_PHY_MAC_CLUSTER_BEACON_RA_VALIDITY                                                    \
