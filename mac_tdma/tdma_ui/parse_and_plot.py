@@ -14,11 +14,10 @@ MASTER_LOG_FILE = "master_output.txt"
 CSV_FILE = "tdma.csv"
 
 # SAFETY LIMITS (prevents matplotlib freeze)
-MAX_ROWS = 500        # hard cap for plotting
+MAX_ROWS = 100        # hard cap for plotting
 DOWNSAMPLE = 5         # vlines reduction factor
+OFFSET = 700          # wait for both clients to converge
 
-# Convert modem ticks to milliseconds (unused but kept)
-TICKS_TO_MS = 1 / 69120
 
 
 def parse_master_log(log_file):
@@ -27,56 +26,111 @@ def parse_master_log(log_file):
         return []
 
     records = []
-    current_pdc = None
 
     with open(log_file, "r") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line:
-                continue
+        lines = f.readlines()
 
-            # Beacon
-            m = re.search(r"Beacon TX callback fired:\s*frame_time=([\d\.]+)", line)
-            if m:
-                records.append({
-                    "frame_time": float(m.group(1)),
-                    "beacon": True,
-                    "seq": None,
-                    "tx_id": 0
-                })
-                continue
+    # -------------------------------------------------
+    # Find first beacon
+    # -------------------------------------------------
+    first_beacon_time = None
 
-            # PDC start
-            m = re.search(r"PDC received at frame_time\s+([\d\.]+)", line)
-            if m:
-                if current_pdc is not None:
-                    records.append(current_pdc)
+    for line in lines:
+        m = re.search(
+            r"Beacon TX callback fired:\s*frame_time=([\d.]+)\s*ms",
+            line
+        )
 
-                current_pdc = {
-                    "frame_time": float(m.group(1)),
-                    "beacon": False,
-                    "seq": None,
-                    "tx_id": None
-                }
-                continue
+        if m:
+            first_beacon_time = float(m.group(1))
+            print(f"Found first beacon at: {first_beacon_time} ms")
+            break
 
-            if current_pdc is None:
-                continue
+    if first_beacon_time is None:
+        print("No beacon found in log")
+        return []
 
-            # Seq
-            m = re.search(r"Seq Nbr:\s*(\d+)", line, re.IGNORECASE)
-            if m:
-                current_pdc["seq"] = int(m.group(1))
+    # -------------------------------------------------
+    # Parse log
+    # -------------------------------------------------
+    current_pdc = None
 
-            # Tx ID
-            m = re.search(r"Tx id:\s*(\d+)", line, re.IGNORECASE)
-            if m:
-                current_pdc["tx_id"] = int(m.group(1))
-                records.append(current_pdc)
-                current_pdc = None
+    for raw_line in lines:
+        line = raw_line.strip()
 
-    if current_pdc is not None:
-        records.append(current_pdc)
+        if not line:
+            continue
+
+        # -------------------------------------------------
+        # Beacon
+        # -------------------------------------------------
+        m = re.search(
+            r"Beacon TX callback fired:\s*frame_time=([\d.]+)\s*ms",
+            line
+        )
+
+        if m:
+            beacon_time = float(m.group(1)) - first_beacon_time
+
+            records.append({
+                "frame_time": beacon_time,
+                "beacon": True,
+                "seq": None,
+                "tx_id": 0,
+                "temperature": None
+            })
+
+            continue
+
+        # -------------------------------------------------
+        # PDC start
+        # -------------------------------------------------
+        m = re.search(
+            r"PDC received at frame_time\s+([\d.]+)\s*ms",
+            line
+        )
+
+        if m:
+            current_pdc = {
+                "frame_time": float(m.group(1)) - first_beacon_time,
+                "beacon": False,
+                "seq": None,
+                "tx_id": None,
+                "temperature": None
+            }
+
+            continue
+
+        if current_pdc is None:
+            continue
+
+        # -------------------------------------------------
+        # Sequence number
+        # -------------------------------------------------
+        m = re.search(r"Seq Nbr:\s*(\d+)", line, re.IGNORECASE)
+
+        if m:
+            current_pdc["seq"] = int(m.group(1))
+            continue
+
+        # -------------------------------------------------
+        # Compact TX/TEMP line
+        # Example:
+        # Tx:2(0x0002) Temp:33(0x0021)
+        # -------------------------------------------------
+        m = re.search(
+            r"Tx:(\d+)\(0x[0-9a-fA-F]+\)\s+Temp:(\d+)\(0x[0-9a-fA-F]+\)",
+            line
+        )
+
+        if m:
+            current_pdc["tx_id"] = int(m.group(1))
+            current_pdc["temperature"] = int(m.group(2))
+
+            records.append(current_pdc)
+            current_pdc = None
+
+            continue
 
     return records
 
@@ -107,9 +161,10 @@ def plot_tdma_timeline(csv_file):
     df = df.sort_values("frame_time")
 
     # -------------------------------------------------
-    # DEBUG LIMIT (CRITICAL FIX)
+    # DEBUG LIMIT
     # -------------------------------------------------
-    df = df.head(MAX_ROWS)
+    # select df max rows with an offset
+    df = df.head(MAX_ROWS + OFFSET)
 
     beacon_df = df[df["beacon"] == True].copy()
     pdc_df = df[df["beacon"] == False].copy()
@@ -138,7 +193,7 @@ def plot_tdma_timeline(csv_file):
             subset = pdc_df[pdc_df["tx_id"] == tx]
 
             # DOWN SAMPLE (CRITICAL FIX)
-            subset = subset.iloc[::DOWNSAMPLE]
+            #subset = subset.iloc[::DOWNSAMPLE]
 
             plt.vlines(
                 subset["time_ms"],
@@ -200,6 +255,41 @@ def plot_tdma_timeline(csv_file):
   
 
 
+def print_seq_stats(df):
+    # remove beacon rows
+    pdc = df[df["beacon"] == False].copy()
+
+    # drop invalid rows
+    pdc = pdc.dropna(subset=["seq", "tx_id"])
+
+    pdc["seq"] = pdc["seq"].astype(int)
+    pdc["tx_id"] = pdc["tx_id"].astype(int)
+
+    print("\n=== Per (TX ID, SEQ) message counts ===")
+    grouped = pdc.groupby(["tx_id", "seq"]).size().reset_index(name="count")
+
+    for _, row in grouped.sort_values(["tx_id", "seq"]).iterrows():
+        print(f"TX {row['tx_id']} | Seq {row['seq']} -> {row['count']} msgs")
+
+    print("\n=== Per TX summary ===")
+    tx_summary = pdc.groupby("tx_id").agg(
+        total_msgs=("seq", "count"),
+        unique_seqs=("seq", "nunique"),
+        min_seq=("seq", "min"),
+        max_seq=("seq", "max"),
+    )
+
+    print(tx_summary.to_string())
+
+    print("\n=== Duplicate detection (seq reuse per tx) ===")
+    dup = pdc.groupby(["tx_id", "seq"]).size()
+    dup = dup[dup > 1]
+
+    if len(dup) == 0:
+        print("No duplicate seq numbers found per TX.")
+    else:
+        print(dup.to_string())
+
 def main():
     print(f"Parsing {MASTER_LOG_FILE}...")
 
@@ -209,7 +299,11 @@ def main():
         print("No records found")
         return
 
+    df = pd.DataFrame(records)
+
     print(f"Found {len(records)} TDMA events")
+
+    print_seq_stats(df)
 
     print(f"Saving CSV -> {CSV_FILE}")
 

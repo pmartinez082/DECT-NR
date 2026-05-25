@@ -35,10 +35,13 @@ static void dect_phy_mac_message_print(dect_phy_mac_message_type_t message_type,
 
 		memcpy(ascii_data, message->data_sdu.data, message->data_sdu.data_length);
 		ascii_data[message->data_sdu.data_length] = '\0';
-		// Print only tx_id (first 16 bits)
-		desh_print("Tx id: %u (0x%04x)", message->data_sdu.data[0] << 8 | message->data_sdu.data[1], message->data_sdu.data[0] << 8 | message->data_sdu.data[1]);
-		/*
+		uint16_t tx_id = ((uint16_t)message->data_sdu.data[0] << 8) | message->data_sdu.data[1];
+		uint16_t temp  = ((uint16_t)message->data_sdu.data[2] << 8) | message->data_sdu.data[3];
 
+printk("Tx:%u(0x%04x) Temp:%u(0x%04x)\n",
+       tx_id, tx_id,
+       temp, temp);
+/*
 		desh_print("        DLC IE type: %s (0x%02x)",
 			   dect_phy_mac_dlc_pdu_ie_type_string_get(message->data_sdu.dlc_ie_type),
 			   message->data_sdu.dlc_ie_type);
@@ -293,7 +296,7 @@ static void dect_phy_mac_print_tdma_info(
 					     dect_phy_mac_common_header_t *common_header, 
 					 uint64_t time){
 
-		desh_print("PDC received at frame_time %f", MODEM_TICKS_TO_MS(time));
+		desh_print("PDC received at frame_time %f ms", MODEM_TICKS_TO_MS(time));
 	
 	
 

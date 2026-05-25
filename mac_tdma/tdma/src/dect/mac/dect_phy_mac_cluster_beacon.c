@@ -442,7 +442,7 @@ static void dect_phy_mac_cluster_beacon_to_mdm_cb(
 		beacon_data.last_tx_frame_time = frame_time;
 
 		/* Print current frame_time */
-		printk("Beacon TX callback fired: frame_time=%llu\n", frame_time);
+		printk("Beacon TX callback fired: frame_time=%f ms\n", MODEM_TICKS_TO_MS(frame_time));	
 
 		/* TDMA scheduling temporarily disabled to avoid ISR mutex use.
 		 * It can be re‑enabled by submitting tdma_schedule_work from

@@ -127,7 +127,7 @@ int dect_common_utils_slots_in_bytes(uint8_t slots, uint8_t mcs)
 	return byte_count;
 }
 
-int dect_common_utils_max_slots_per_mcs(uint8_t mcs){
+int dect_common_utils_max_slots_per_mcs_old(uint8_t mcs){
 	struct {
 			int mcs;
 			int min_slot;
@@ -148,6 +148,34 @@ int dect_common_utils_max_slots_per_mcs(uint8_t mcs){
 	}
 	return -1;
 }
+
+
+
+
+int dect_common_utils_max_slots_per_mcs(uint8_t mcs){
+	struct {
+			int mcs;
+			int min_slot;
+			int max_slot;
+		} client_mcs_defaults[] = {
+	{0, 1, 3}, 
+	{1, 1, 3},
+	{2, 1, 3},
+	{3, 1, 3},
+	{4, 1, 3},
+	};
+	
+// find the max slots associated with a given mcs
+	for (int i = 0; i <5; i++) {
+		if (client_mcs_defaults[i].mcs == mcs) {
+			return client_mcs_defaults[i].max_slot -1;
+		}
+	}
+	return -1;
+}
+
+
+
 
 
 

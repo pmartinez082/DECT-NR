@@ -204,13 +204,17 @@ static int dect_phy_mac_client_data_pdu_encode(
 		payload_len;
 
     /* Include tx_id as first two bytes of payload */
-    if (payload_len >= 2) {
+    if (payload_len >= 4) {
         uint16_t effective_tx_id = params->tx_id ? params->tx_id : seq_nbr;
 
         data_sdu->message.data_sdu.data[0] = (uint8_t)((effective_tx_id >> 8) & 0xFF);
         data_sdu->message.data_sdu.data[1] = (uint8_t)(effective_tx_id & 0xFF);
-        /* Fill rest with deterministic pattern starting from byte 2 */
-        for (uint16_t i = 2; i < payload_len; i++)
+		// add temperature
+		uint16_t modem_temp = dect_phy_ctrl_modem_temperature_get();
+		data_sdu->message.data_sdu.data[2] = (uint8_t) (modem_temp>>8);
+		data_sdu->message.data_sdu.data[3] = (uint8_t) (modem_temp&0xFF);
+        /* Fill rest with deterministic pattern starting from byte 4 */
+        for (uint16_t i = 4; i < payload_len; i++)
             data_sdu->message.data_sdu.data[i] = (uint8_t)(i - 2);
     } else {
         /* Fallback if payload is too small for tx_id */
@@ -545,7 +549,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         tx_frame_time += beacon_interval_ticks;
     }
 
-    for (int tx_iteration = 0; tx_iteration < 50; tx_iteration++) {
+    for (int tx_iteration = 0; tx_iteration < 40; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
             dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
