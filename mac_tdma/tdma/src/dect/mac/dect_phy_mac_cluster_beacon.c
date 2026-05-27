@@ -272,7 +272,7 @@ static int dect_phy_mac_cluster_beacon_encode(struct dect_phy_mac_beacon_start_p
 		.frame_offset_bit = 0,
 		.next_channel_bit = 0,
 		.time_to_next = 0,
-		.nw_beacon_period = DECT_PHY_MAC_NW_BEACON_PERIOD_50MS,
+		.nw_beacon_period = DECT_PHY_MAC_NW_BEACON_PERIOD_4000MS,
 		.cluster_beacon_period = DECT_PHY_MAC_CLUSTER_BEACON_PERIOD_2000MS,
 		.count_to_trigger = 0,
 		.relative_quality = 0,
