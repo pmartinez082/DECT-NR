@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 2s
+
+scrape_configs:
+  - job_name: "tdma"
+
+    static_configs:
+      - targets:
+          - tdma_exporter:8000
