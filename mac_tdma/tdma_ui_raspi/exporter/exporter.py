@@ -41,6 +41,7 @@ frame_time_gauge = Gauge(
     ["tx_id"]
 )
 
+tx_event = Gauge("tdma_tx_event", "TDMA transmission event", ["tx_id"])
 # -------------------------------------------------
 # Regex
 # -------------------------------------------------

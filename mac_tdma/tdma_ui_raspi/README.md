@@ -171,6 +171,57 @@ The debug log panel at the top shows all application events including:
 - Check TX Power is within valid range
 - Reduce TX Power if device is too close
 
-## License
 
-ISC
+# TDMA data visualization: GRAFANA
+The TDMA UI (tdma_ui_raspi folder) can export live telemetry metrics to Prometheus and visualize them in Grafana for real-time monitoring of:
+- Beacon activity
+- Packet throughput
+- Temperature
+
+## Architecture
+DECT Logs
+   ↓
+Python TDMA Exporter
+   ↓
+Prometheus
+   ↓
+Grafana Dashboard
+
+## Installation guide
+### Install Docker on Raspberry Pi
+curl -fsSL https://get.docker.com | sh
+
+sudo usermod -aG docker $USER
+
+Reboot or re-login afterward.
+
+### Install Docker Compose plugin:
+
+sudo apt install docker-compose-plugin
+### Run docker command
+docker compose up -d
+
+## Results
+### Grafana
+http://<RASPBERRY_PI_IP>:3000
+
+Default credentials:
+
+Username: admin
+Password: admin
+### Prometheus
+http://<RASPBERRY_PI_IP>:9090
+### Exported Metrics
+http://<RASPBERRY_PI_IP>:8000/metrics
+### Grafana Setup
+- Add Prometheus Data Source
+- Open Grafana
+- Navigate to: Connections-Data Sources-Add data source-Select: Prometheus
+- Set URL: http://prometheus:9090
+- Click: Save & Test
+
+## Recommended Grafana Queries
+- Temperature Per Node: tdma_temperature_celsius
+- Packet Rate: rate(tdma_packets_total[30s])
+- Sequence Tracking: tdma_sequence
+- Beacon Rate: rate(tdma_beacons_total[1m])
