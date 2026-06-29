@@ -21,8 +21,8 @@ window.api = {
   dissociate: (slaveNum, masterId) => ipcRenderer.send('dissociate', { slaveNum, masterId }),
   
   // RACH commands
-  rachTxStart: (slaveNum, masterId, data, mcs, txPower, interval) => 
-    ipcRenderer.send('rach-tx-start', { slaveNum, masterId, data, mcs, txPower, interval }),
+  rachTxStart: (slaveNum, masterId, data, mcs, txPower, interval, tdmaMultiplier, tdmaIterationCount) => 
+    ipcRenderer.send('rach-tx-start', { slaveNum, masterId, data, mcs, txPower, interval, tdmaMultiplier, tdmaIterationCount }),
   rachTxStop: (slaveNum) => ipcRenderer.send('rach-tx-stop', { slaveNum }),
   
   // IPC invoke methods

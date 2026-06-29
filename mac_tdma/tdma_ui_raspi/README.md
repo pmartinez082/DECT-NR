@@ -16,6 +16,8 @@ A comprehensive Electron-based user interface for controlling DECT NR+ TDMA oper
   - Single shot or periodic transmission
   - Configurable MCS (0-4)
   - TX Power control (-20 to +20 dBm)
+  - Optional TDMA iteration multiplier for client frame spacing (default 4)
+  - Optional TDMA iteration count for the number of scheduled transmissions (default 40)
   - Optional periodic interval (1-3600 seconds)
 - **Real-time Output**: View association and transmission status
 
@@ -66,6 +68,8 @@ This creates a portable EXE in the `dist` folder.
    - **Data**: Text message to send
    - **MCS**: Modulation and coding scheme (0-4)
    - **TX Power**: Transmission power in dBm (-20 to +20)
+   - **TDMA Iteration Multiplier**: Multiplier for client TDMA frame spacing (default 4)
+   - **TDMA Iteration Count**: Number of client TDMA iterations to schedule (default 40)
    - **Periodic**: Enable for repeated transmission at specified interval
 
 3. Click "Start TX" to begin transmission
@@ -91,10 +95,10 @@ dect mac associate -t <masterId> -m <mcs>
 dect mac dissociate -t <masterId>
 
 # Send single TDMA TX
-dect mac rach_tx -t <masterId> -d "<data>" -m <mcs> --tx_pwr <power>
+dect mac rach_tx -t <masterId> -d "<data>" -m <mcs> --tx_pwr <power> -q <multiplier> -r <iteration_count>
 
 # Send periodic TDMA TX (interval in seconds)
-dect mac rach_tx -t <masterId> -d "<data>" -j -m <mcs> --tx_pwr <power> -i <interval>
+dect mac rach_tx -t <masterId> -d "<data>" -j -m <mcs> --tx_pwr <power> -i <interval> -q <multiplier> -r <iteration_count>
 
 # Stop RACH TX
 dect mac rach_tx stop

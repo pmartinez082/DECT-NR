@@ -71,6 +71,24 @@ static struct {
     uint8_t assigned_slot_start;
 } tdma_client_state;
 
+static uint8_t tdma_tx_iteration_count_last = 0;
+
+static void dect_phy_mac_client_tdma_tx_scheduler_items_clear(uint8_t iteration_count)
+{
+    uint8_t cleanup_count = iteration_count;
+
+    if (tdma_tx_iteration_count_last > cleanup_count) {
+        cleanup_count = tdma_tx_iteration_count_last;
+    }
+
+    for (uint8_t i = 0; i < cleanup_count; i++) {
+        dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
+            DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE + i);
+    }
+
+    tdma_tx_iteration_count_last = iteration_count;
+}
+
 /* Function to set the assigned slot from the association response */
 void dect_phy_mac_client_set_assigned_slot(uint8_t assigned_slot_start)
 {
@@ -440,8 +458,14 @@ int dect_phy_mac_client_rach_tx_start(
 	struct dect_phy_mac_nbr_info_list_item *target_nbr,
 	struct dect_phy_mac_rach_tx_params *params)
 {
+	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
+		DECT_PHY_MAC_CLIENT_RA_TX_HANDLE);
+	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
+		DECT_PHY_MAC_CLIENT_RA_TX_CONTINUOUS_HANDLE);
+
 	client_rach_tx_work_data.cmd_params = *params;
 	client_rach_tx_work_data.target_nbr = *target_nbr;
+	k_work_cancel_delayable(&client_rach_tx_work_data.work);
 	k_work_schedule_for_queue(
 		&dect_phy_ctrl_work_q, &client_rach_tx_work_data.work, K_SECONDS(0));
 
@@ -450,6 +474,10 @@ int dect_phy_mac_client_rach_tx_start(
 
 void dect_mac_client_rach_tx_stop(void)
 {
+	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
+		DECT_PHY_MAC_CLIENT_RA_TX_HANDLE);
+	dect_phy_api_scheduler_list_item_remove_dealloc_by_phy_op_handle(
+		DECT_PHY_MAC_CLIENT_RA_TX_CONTINUOUS_HANDLE);
 	k_work_cancel_delayable(&client_rach_tx_work_data.work);
 }
 
@@ -458,6 +486,7 @@ static int dect_phy_mac_client_tdma_data_tx(
     struct dect_phy_mac_nbr_info_list_item *target_nbr,
     struct dect_phy_mac_rach_tx_params *params)
 {
+	desh_print("multiplier=%u count=%u", params->tdma_tx_iteration_multiplier, params->tdma_tx_iteration_count);
     struct dect_phy_settings *current_settings =
         dect_common_settings_ref_get();
 
@@ -548,8 +577,12 @@ static int dect_phy_mac_client_tdma_data_tx(
     while (tx_frame_time < first_possible) {
         tx_frame_time += beacon_interval_ticks;
     }
+	
+	dect_phy_mac_client_tdma_tx_scheduler_items_clear(params->tdma_tx_iteration_count);
 
-    for (int tx_iteration = 0; tx_iteration < 40; tx_iteration++) {
+	/* Schedules the tx iterations for the assigned slot(s) using the configured
+	 * multiplier to space each iteration by the requested number of 10ms frames. */
+    for (int tx_iteration = 0; tx_iteration < params->tdma_tx_iteration_count; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
             dect_phy_api_scheduler_list_item_alloc_tx_element(&conf_iter);
@@ -558,8 +591,11 @@ static int dect_phy_mac_client_tdma_data_tx(
             return -ENOMEM;
         }
 
-        
-        uint64_t iter_frame_time = tx_frame_time + 4*(tx_iteration * frame_duration);
+        /* Establishes the time between frames.
+         * Frame duration is always 10ms. */
+        uint64_t iter_frame_time = tx_frame_time +
+            ((uint64_t)params->tdma_tx_iteration_multiplier *
+             (uint64_t)tx_iteration * frame_duration);
 
         conf_iter->address_info.network_id = target_nbr->nw_id_32bit;
         conf_iter->address_info.transmitter_long_rd_id =

@@ -152,13 +152,15 @@ document.addEventListener('click', (e) => {
       const mcs = parseInt(document.getElementById(`${prefix}-rach-mcs`).value);
       const txPower = parseInt(document.getElementById(`${prefix}-rach-tx-power`).value);
       const interval = parseInt(document.getElementById(`${prefix}-rach-interval`).value) || 0;
+      const tdmaMultiplier = parseInt(document.getElementById(`${prefix}-rach-tdma-multiplier`).value) || 4;
+      const tdmaIterationCount = parseInt(document.getElementById(`${prefix}-rach-tdma-iteration-count`).value) || 40;
 
       if (!data) {
         alert('Please enter data to send');
         return;
       }
 
-      if (isNaN(masterId) || isNaN(mcs) || isNaN(txPower)) {
+      if (isNaN(masterId) || isNaN(mcs) || isNaN(txPower) || isNaN(tdmaMultiplier)) {
         alert('Invalid parameters');
         return;
       }
@@ -173,7 +175,17 @@ document.addEventListener('click', (e) => {
         return;
       }
 
-      ipcRenderer.send('rach-tx-start', { slaveNum, masterId, data, mcs, txPower, interval });
+      if (tdmaMultiplier < 1 || tdmaMultiplier > 255) {
+        alert('TDMA Iteration Multiplier must be 1-255');
+        return;
+      }
+
+      if (tdmaIterationCount < 1 || tdmaIterationCount > 255) {
+        alert('TDMA Iteration Count must be 1-255');
+        return;
+      }
+
+      ipcRenderer.send('rach-tx-start', { slaveNum, masterId, data, mcs, txPower, interval, tdmaMultiplier, tdmaIterationCount });
     };
 
     // RACH TX Stop

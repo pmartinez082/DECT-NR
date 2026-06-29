@@ -444,6 +444,10 @@ static const char dect_phy_mac_rach_tx_cmd_usage_str[] =
 	"  -t, --long_rd_id <id>,  Target long rd id. Default: 38.\n"
 	"  -i, --interval <interval_secs>, Data sending interval in seconds.\n"
 	"                                  Default: 0, data sent only once.\n"
+	"  -q, --tdma_tx_iteration_multiplier <integer>, Multiplier for TDMA frame iteration spacing.\n"
+	"                                  Default: 4.\n"
+	"  -r, --tdma_tx_iteration_count <integer>, Number of TDMA iterations to schedule.\n"
+	"                                  Default: 40.\n"
 	"  -j, --get_mdm_temp,             Include modem temperature in the payload. The payload\n"
 	"                                  is encoded in JSON.\n"
 	"Note: LBT (Listen Before Talk) is enabled as a default for a min period,\n"
@@ -454,40 +458,43 @@ static const char dect_phy_mac_rach_tx_cmd_usage_str[] =
 
 /* Specifying the expected options (both long and short): */
 static struct option long_options_rach_tx[] = { {"data", required_argument, 0, 'd'},
-						{"msg_tx_id", required_argument, 0, 'x'},
-						{"tx_pwr", required_argument, 0, 'p'},
-						{"tx_mcs", required_argument, 0, 'm'},
-						{"long_rd_id", required_argument, 0, 't'},
-						{"interval", required_argument, 0, 'i'},
-						{"get_mdm_temp", no_argument, 0, 'j'},
-						{0, 0, 0, 0}};
+                        {"msg_tx_id", required_argument, 0, 'x'},
+                        {"tx_pwr", required_argument, 0, 'p'},
+                        {"tx_mcs", required_argument, 0, 'm'},
+                        {"long_rd_id", required_argument, 0, 't'},
+                        {"interval", required_argument, 0, 'i'},
+                        {"tdma_tx_iteration_multiplier", required_argument, 0, 'q'},
+                        {"tdma_tx_iteration_count", required_argument, 0, 'r'},
+                        {"get_mdm_temp", no_argument, 0, 'j'},
+                        {0, 0, 0, 0}};
 
 static int dect_phy_mac_rach_tx_cmd(const struct shell *shell, size_t argc, char **argv)
 {
-	struct dect_phy_mac_rach_tx_params params;
-	int ret = 0;
-	int long_index = 0;
-	int opt;
+    struct dect_phy_mac_rach_tx_params params;
+    int ret = 0;
+    int long_index = 0;
+    int opt;
 
-	if (argc < 2) {
-		goto show_usage;
-	}
-	if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
-		dect_phy_mac_ctrl_rach_tx_stop();
-		desh_print("rach_tx stopped.");
-		return 0;
-	}
-
-	optreset = 1;
-	optind = 1;
-
+    if (argc < 2) {
+        goto show_usage;
+    }
+    if (argv[1] != NULL && !strcmp(argv[1], "stop")) {
+        dect_phy_mac_ctrl_rach_tx_stop();
+        desh_print("rach_tx stopped.");
+        return 0;
+    }
+	memset(&params, 0, sizeof(params));
 	params.tx_power_dbm = 0;
 	params.mcs = 0;
 	params.target_long_rd_id = 38;
 	params.interval_secs = 0;
+	params.tdma_tx_iteration_multiplier = 4;
+	params.tdma_tx_iteration_count = 40;
 	params.get_mdm_temp = false;
 
-	while ((opt = getopt_long(argc, argv, "d:p:m:t:i:jh", long_options_rach_tx,
+	optind = 0;
+	long_index = 0;
+	while ((opt = getopt_long(argc, argv, "d:p:m:t:i:q:r:jh", long_options_rach_tx,
 				  &long_index)) != -1) {
 		switch (opt) {
 		case 't': {
@@ -528,6 +535,24 @@ static int dect_phy_mac_rach_tx_cmd(const struct shell *shell, size_t argc, char
 				desh_error("The interval must be positive.");
 				return -EINVAL;
 			}
+			break;
+		}
+		case 'q': {
+			unsigned long value = shell_strtoul(optarg, 10, &ret);
+			if (ret || value == 0 || value > UINT8_MAX) {
+				desh_error("Give a valid TDMA iteration multiplier (1..255)");
+				return -EINVAL;
+			}
+			params.tdma_tx_iteration_multiplier = (uint8_t)value;
+			break;
+		}
+		case 'r': {
+			unsigned long value = shell_strtoul(optarg, 10, &ret);
+			if (ret || value == 0 || value > UINT8_MAX) {
+				desh_error("Give a valid TDMA iteration count (1..255)");
+				return -EINVAL;
+			}
+			params.tdma_tx_iteration_count = (uint8_t)value;
 			break;
 		}
 		case 'j': {
@@ -600,7 +625,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(dissociate, NULL, "Usage: dect mac dissociate -h",
 		      dect_phy_mac_dissociate_cmd, 1, 6),
 	SHELL_CMD_ARG(rach_tx, NULL, "Usage options: dect mac rach_tx -h",
-		      dect_phy_mac_rach_tx_cmd, 1, 11),
+			  dect_phy_mac_rach_tx_cmd, 1, 20),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_SUBCMD_ADD((dect), mac, &mac_shell_cmd_sub,

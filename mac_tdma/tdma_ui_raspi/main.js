@@ -462,11 +462,11 @@ ipcMain.on('dissociate', (event, { slaveNum, masterId }) => {
   sendSerialCommand(slavePorts[slaveKey], cmd, `SLAVE${slaveNum}`);
 });
 
-ipcMain.on('rach-tx-start', (event, { slaveNum, masterId, data, mcs, txPower, interval }) => {
+ipcMain.on('rach-tx-start', (event, { slaveNum, masterId, data, mcs, txPower, interval, tdmaMultiplier, tdmaIterationCount }) => {
   const slaveKey = `slave${slaveNum}`;
   const cmd = interval != 0 
-    ? `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum} -i ${interval}`
-    : `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum}`;
+    ? `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum} -i ${interval} -q ${tdmaMultiplier} -r ${tdmaIterationCount}`
+    : `dect mac rach_tx -t ${masterId} -m ${mcs} --tx_pwr ${txPower} --msg_tx_id ${slaveNum} -q ${tdmaMultiplier} -r ${tdmaIterationCount}`;
   activeSlaveCommands[slaveKey] = 'rach_tx';
   log(`[SLAVE${slaveNum}] Starting RACH TX to master ${masterId}`);
   sendSerialCommand(slavePorts[slaveKey], cmd, `SLAVE${slaveNum}`);
