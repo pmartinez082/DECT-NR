@@ -146,16 +146,17 @@
           <small>Range: -20 to +20 dBm</small>
         </div>
 
-        <div class="form-group">
-          <label for="slave1-rach-tdma-multiplier">TDMA Iteration Multiplier:</label>
-          <input type="number" id="slave1-rach-tdma-multiplier" min="1" max="255" step="1" value="4">
-          <small>Multiplier for client TDMA frame spacing (default 4).</small>
-        </div>
 
         <div class="form-group">
           <label for="slave1-rach-tdma-iteration-count">TDMA Iteration Count:</label>
-          <input type="number" id="slave1-rach-tdma-iteration-count" min="1" max="255" step="1" value="40">
-          <small>Number of TDMA iterations to schedule (default 40).</small>
+          <select id="slave1-rach-tdma-iteration-count">
+            <option value="10" data-spacing="20">10 iterations - 200 ms spacing</option>
+              <option value="20" data-spacing="10">20 iterations - 100 ms spacing</option>
+              <option value="30" data-spacing="6.6">30 iterations - 66 ms spacing</option>
+              <option value="40" data-spacing="5" selected>40 iterations - 50 ms   spacing</option>
+              <option value="50" data-spacing="4">50 iterations - 4 spacing</option>
+          </select>
+          <small>Number of TDMA iterations to schedule (default 40 - 5 spacing).</small>
         </div>
 
         <div class="form-group checkbox-group">
@@ -273,17 +274,17 @@
           <small>Range: -20 to +20 dBm</small>
         </div>
 
-        <div class="form-group">
-          <label for="slave2-rach-tdma-multiplier">TDMA Iteration Multiplier:</label>
-          <input type="number" id="slave2-rach-tdma-multiplier" min="1" max="255" step="1" value="4">
-          <small>Multiplier for client TDMA frame spacing (default 4).</small>
-        </div>
-
-
+      
     <div class="form-group">
             <label for="slave2-rach-tdma-iteration-count">TDMA Iteration Count:</label>
-            <input type="number" id="slave2-rach-tdma-iteration-count" min="1" max="255" step="1" value="40">
-            <small>Number of TDMA iterations to schedule (default 40).</small>
+            <select id="slave2-rach-tdma-iteration-count">
+              <option value="10" data-spacing="20">10 iterations - 200 ms spacing</option>
+              <option value="20" data-spacing="10">20 iterations - 100 ms spacing</option>
+              <option value="30" data-spacing="6.6">30 iterations - 66 ms spacing</option>
+              <option value="40" data-spacing="5" selected>40 iterations - 50 ms   spacing</option>
+              <option value="50" data-spacing="4">50 iterations - 4 spacing</option>
+            </select>
+            <small>Number of TDMA iterations to schedule (default 40 - 5 spacing).</small>
           </div>
 
 

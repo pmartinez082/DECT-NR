@@ -40,6 +40,13 @@ frame_time_gauge = Gauge(
     "Latest frame time",
     ["tx_id"]
 )
+inter_message_gauge = Gauge(
+    "tdma_inter_message_seconds",
+    "Time since the previous message from this TX",
+    ["tx_id"]
+)
+
+last_message_time = {}  # tx_id -> last timestamp (wall clock, seconds)
 
 tx_event = Gauge("tdma_tx_event", "TDMA transmission event", ["tx_id"])
 # -------------------------------------------------
@@ -146,6 +153,37 @@ def main():
                     f"TX={tx_id} "
                     f"SEQ={current_seq} "
                     f"TEMP={temp}"
+                )
+
+            # TX/TEMP
+            m = DATA_RE.search(line)
+            if m:
+                tx_id = m.group(1)
+                temp = int(m.group(2))
+
+                now = time.time()
+                if tx_id in last_message_time:
+                    delta = now - last_message_time[tx_id]
+                    inter_message_gauge.labels(tx_id=tx_id).set(delta)
+                last_message_time[tx_id] = now
+
+                packet_counter.labels(tx_id=tx_id).inc()
+                temperature_gauge.labels(
+                    tx_id=tx_id
+                ).set(temp)
+                if current_seq is not None:
+                    seq_gauge.labels(
+                        tx_id=tx_id
+                    ).set(current_seq)
+                if current_frame_time is not None:
+                    frame_time_gauge.labels(
+                        tx_id=tx_id
+                    ).set(current_frame_time)
+                print(
+                    f"TX={tx_id} "
+                    f"SEQ={current_seq} "
+                    f"TEMP={temp} "
+                    f"DT={delta if tx_id in last_message_time else 'n/a'}"
                 )
 
 if __name__ == "__main__":

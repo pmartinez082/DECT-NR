@@ -486,7 +486,7 @@ static int dect_phy_mac_client_tdma_data_tx(
     struct dect_phy_mac_nbr_info_list_item *target_nbr,
     struct dect_phy_mac_rach_tx_params *params)
 {
-	desh_print("multiplier=%u count=%u", params->tdma_tx_iteration_multiplier, params->tdma_tx_iteration_count);
+	
     struct dect_phy_settings *current_settings =
         dect_common_settings_ref_get();
 
@@ -579,7 +579,7 @@ static int dect_phy_mac_client_tdma_data_tx(
     }
 	
 	dect_phy_mac_client_tdma_tx_scheduler_items_clear(params->tdma_tx_iteration_count);
-
+	desh_print("multiplier=%u count=%u", params->tdma_tx_iteration_multiplier, params->tdma_tx_iteration_count);
 	/* Schedules the tx iterations for the assigned slot(s) using the configured
 	 * multiplier to space each iteration by the requested number of 10ms frames. */
     for (int tx_iteration = 0; tx_iteration < params->tdma_tx_iteration_count; tx_iteration++) {

@@ -237,6 +237,7 @@ function updateStatusUI() {
 
 const MASTER_LOG_FILE = 'master_output.txt';
 // Create stream in append mode
+fs.truncate(MASTER_LOG_FILE, 0, function(){console.log('done')})
 const masterLogStream = fs.createWriteStream(MASTER_LOG_FILE, { flags: 'a' });
 
 /* ===================== IPC HANDLERS ===================== */

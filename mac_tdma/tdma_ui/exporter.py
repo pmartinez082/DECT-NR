@@ -90,6 +90,8 @@ def main():
     current_seq = None
 
     with open(LOG_FILE, "r") as f:
+    
+       
 
         for line in follow(f):
 

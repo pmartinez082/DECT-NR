@@ -152,8 +152,11 @@ document.addEventListener('click', (e) => {
       const mcs = parseInt(document.getElementById(`${prefix}-rach-mcs`).value);
       const txPower = parseInt(document.getElementById(`${prefix}-rach-tx-power`).value);
       const interval = parseInt(document.getElementById(`${prefix}-rach-interval`).value) || 0;
-      const tdmaMultiplier = parseInt(document.getElementById(`${prefix}-rach-tdma-multiplier`).value) || 4;
-      const tdmaIterationCount = parseInt(document.getElementById(`${prefix}-rach-tdma-iteration-count`).value) || 40;
+    
+      const tdmaIterationCountEl = document.getElementById(`${prefix}-rach-tdma-iteration-count`);
+      const tdmaIterationCount = parseInt(tdmaIterationCountEl.value) || 40;
+      const tdmaMultiplier = parseFloat(tdmaIterationCountEl.selectedOptions[0].dataset.spacing) || 4; console.log(tdmaMultiplier)
+
 
       if (!data) {
         alert('Please enter data to send');
