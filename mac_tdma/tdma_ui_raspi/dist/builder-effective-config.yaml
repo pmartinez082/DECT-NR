@@ -1,0 +1,21 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.dect.tdmaui
+productName: DECT TDMA UI
+forceCodeSigning: false
+files:
+  - filter:
+      - main.js
+      - preload.js
+      - renderer.js
+      - index.html
+      - style.css
+      - node_modules/**/*
+      - package.json
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+electronVersion: 39.8.9

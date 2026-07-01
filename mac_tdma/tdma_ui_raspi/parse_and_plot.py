@@ -14,11 +14,12 @@ MASTER_LOG_FILE = "logs/master_output.txt"
 CSV_FILE = "tdma.csv"
 
 # SAFETY LIMITS (prevents matplotlib freeze)
+'''
 MAX_ROWS = 100        # hard cap for plotting
 DOWNSAMPLE = 5         # vlines reduction factor
 OFFSET = 700          # wait for both clients to converge
 
-
+'''
 
 def parse_master_log(log_file):
     if not Path(log_file).exists():
@@ -164,7 +165,7 @@ def plot_tdma_timeline(csv_file):
     # DEBUG LIMIT
     # -------------------------------------------------
     # select df max rows with an offset
-    df = df.head(MAX_ROWS + OFFSET)
+   # df = df.head(MAX_ROWS + OFFSET)
 
     beacon_df = df[df["beacon"] == True].copy()
     pdc_df = df[df["beacon"] == False].copy()
@@ -248,26 +249,22 @@ def plot_tdma_timeline(csv_file):
     print(f"Saved plot to {out_file}")
 
     # Optional (safe now)
-    plt.show()
+    #plt.show()
     # Avoid freeze in some backends
     plt.close()
 
   
-
-
 def print_seq_stats(df):
+    BATCH_SIZE = 50  # expected packets per iteration/batch
+
     # remove beacon rows
     pdc = df[df["beacon"] == False].copy()
-
-    # drop invalid rows
     pdc = pdc.dropna(subset=["seq", "tx_id"])
-
     pdc["seq"] = pdc["seq"].astype(int)
     pdc["tx_id"] = pdc["tx_id"].astype(int)
 
     print("\n=== Per (TX ID, SEQ) message counts ===")
     grouped = pdc.groupby(["tx_id", "seq"]).size().reset_index(name="count")
-
     for _, row in grouped.sort_values(["tx_id", "seq"]).iterrows():
         print(f"TX {row['tx_id']} | Seq {row['seq']} -> {row['count']} msgs")
 
@@ -278,17 +275,190 @@ def print_seq_stats(df):
         min_seq=("seq", "min"),
         max_seq=("seq", "max"),
     )
-
     print(tx_summary.to_string())
 
     print("\n=== Duplicate detection (seq reuse per tx) ===")
     dup = pdc.groupby(["tx_id", "seq"]).size()
     dup = dup[dup > 1]
-
     if len(dup) == 0:
         print("No duplicate seq numbers found per TX.")
     else:
         print(dup.to_string())
+
+# -------------------------------------------------
+    # Batch-based inter-frame timing (50 packets = 1 iteration)
+    # Expected period = 40 ms, tolerance = ±half-period for matching
+    # -------------------------------------------------
+    PERIOD_MS   = 40.0
+    TOLERANCE   = PERIOD_MS / 2.0   # 20 ms match window
+    print(f"\n=== Batch inter-frame timing (batch_size={BATCH_SIZE}, period={PERIOD_MS} ms) ===")
+
+    pdc_sorted = pdc.sort_values(["tx_id", "frame_time"]).copy()
+    pdc_sorted["batch"] = (
+        pdc_sorted.groupby("tx_id").cumcount() // BATCH_SIZE
+    )
+    # discard last batch of each tx
+    # Drop the last batch for each TX (incomplete / stop-emulation artefact)
+    last_batch_per_tx = pdc_sorted.groupby("tx_id")["batch"].transform("max")
+    pdc_sorted = pdc_sorted[pdc_sorted["batch"] < last_batch_per_tx]
+     # DEBUG
+    print("\n=== Batch assignment debug ===")
+    print(pdc_sorted.groupby(["tx_id", "batch"]).size().to_string())
+    
+    # Drop the last batch for each TX
+    last_batch_per_tx = pdc_sorted.groupby("tx_id")["batch"].transform("max")
+    pdc_sorted = pdc_sorted[pdc_sorted["batch"] < last_batch_per_tx]
+    
+    print(f"\nAfter last-batch drop: {len(pdc_sorted)} rows remaining")
+    stats_rows  = []
+    loss_rows   = []   # one row per missing slot
+
+
+    for (tx_id, batch_idx), group in pdc_sorted.groupby(["tx_id", "batch"]):
+        times    = np.sort(group["frame_time"].values)
+        received = len(times)
+
+        if received == 0:
+            continue
+
+        # ---------------------------------------------------
+        # Estimate actual period from this batch's data.
+        # Use median of deltas to be robust against gaps.
+        # Fall back to PERIOD_MS if too few packets.
+        # ---------------------------------------------------
+        if received >= 2:
+            deltas          = np.diff(times)
+            # Only use deltas close to expected period (ignore multi-slot gaps)
+            clean_deltas    = deltas[deltas <= PERIOD_MS * 1.8]
+            measured_period = float(np.median(clean_deltas)) if len(clean_deltas) else PERIOD_MS
+        else:
+            measured_period = PERIOD_MS
+
+        # ---------------------------------------------------
+        # Find best anchor: try every received packet as slot-0
+        # and pick the one that maximises matches.
+        # ---------------------------------------------------
+        def count_matches(anchor, period):
+            matched = 0
+            used    = [False] * received
+            for k in range(BATCH_SIZE):
+                exp = anchor + k * period
+                for i, t in enumerate(times):
+                    if not used[i] and abs(t - exp) <= TOLERANCE:
+                        used[i] = True
+                        matched += 1
+                        break
+            return matched
+
+        best_anchor  = times[0]
+        best_matches = count_matches(times[0], measured_period)
+
+        for candidate in times[1:]:
+            # candidate could be slot k — try offsets back
+            for k in range(1, min(5, BATCH_SIZE)):
+                anchor_try = candidate - k * measured_period
+                m = count_matches(anchor_try, measured_period)
+                if m > best_matches:
+                    best_matches = m
+                    best_anchor  = anchor_try
+
+        expected_times = best_anchor + np.arange(BATCH_SIZE) * measured_period
+
+        # ---------------------------------------------------
+        # Now do the actual matching with the best anchor
+        # ---------------------------------------------------
+        used        = [False] * received
+        slot_status = []
+
+        for slot_idx, exp_t in enumerate(expected_times):
+            best_i    = None
+            best_dist = np.inf
+
+            for i, t in enumerate(times):
+                if used[i]:
+                    continue
+                dist = abs(t - exp_t)
+                if dist < best_dist and dist <= TOLERANCE:
+                    best_dist = dist
+                    best_i    = i
+
+            if best_i is not None:
+                used[best_i] = True
+                slot_status.append({
+                    "slot":        slot_idx,
+                    "expected_ms": round(exp_t,           3),
+                    "actual_ms":   round(times[best_i],   3),
+                    "offset_ms":   round(times[best_i] - exp_t, 3),
+                    "matched":     True,
+                })
+            else:
+                slot_status.append({
+                    "slot":        slot_idx,
+                    "expected_ms": round(exp_t, 3),
+                    "actual_ms":   None,
+                    "offset_ms":   None,
+                    "matched":     False,
+                })
+                loss_rows.append({
+                    "tx_id":       tx_id,
+                    "batch":       batch_idx,
+                    "slot":        slot_idx,
+                    "expected_ms": round(exp_t, 3),
+                })
+    if not stats_rows:
+        print("No batch data to summarise.")
+        return
+
+    stats_df = pd.DataFrame(stats_rows)
+    loss_df  = pd.DataFrame(loss_rows) if loss_rows else pd.DataFrame(
+        columns=["tx_id", "batch", "slot", "expected_ms"]
+    )
+
+    # -------------------------------------------------
+    # Cross-batch summary per TX
+    # -------------------------------------------------
+    print("\n=== Per-TX batch summary ===")
+    for tx_id, g in stats_df.groupby("tx_id"):
+        valid = g.dropna(subset=["interval_mean_ms"])
+        print(
+            f"  TX {tx_id} | batches={len(g)} | "
+            f"avg_loss={g['loss_pct'].mean():.1f}% | "
+            f"mean_jitter={valid['interval_mean_ms'].mean():.2f} ms | "
+            f"p95_max={valid['interval_p95_ms'].max():.2f} ms"
+        )
+
+    # -------------------------------------------------
+    # Save CSVs
+    # -------------------------------------------------
+    stats_csv = "tdma_batch_stats.csv"
+    loss_csv  = "tdma_missing_packets.csv"
+
+    stats_df.to_csv(stats_csv, index=False)
+    loss_df.to_csv(loss_csv,   index=False)
+
+    print(f"\nSaved batch stats    -> {stats_csv}")
+    print(f"Saved missing packets -> {loss_csv}  ({len(loss_df)} missing slots)")
+    # -------------------------------------------------
+    # Cross-batch summary per TX
+    # -------------------------------------------------
+    print("\n=== Per-TX batch summary ===")
+    for tx_id, g in stats_df.groupby("tx_id"):
+        valid = g.dropna(subset=["interval_mean_ms"])
+        print(
+            f"  TX {tx_id} | batches={len(g)} | "
+            f"avg_loss={g['loss_pct'].mean():.1f}% | "
+            f"mean_interval={valid['interval_mean_ms'].mean():.2f} ms | "
+            f"p95_max={valid['interval_p95_ms'].max():.2f} ms"
+        )
+
+    # -------------------------------------------------
+    # Save stats CSV
+    # -------------------------------------------------
+    stats_csv = "tdma_batch_stats.csv"
+    stats_df.to_csv(stats_csv, index=False)
+    print(f"\nSaved batch stats -> {stats_csv}")
+
+
 
 def main():
     print(f"Parsing {MASTER_LOG_FILE}...")

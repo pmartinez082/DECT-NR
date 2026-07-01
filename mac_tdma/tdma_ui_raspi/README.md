@@ -205,6 +205,12 @@ sudo apt install docker-compose-plugin
 ### Run docker command
 docker compose up -d
 
+### Restart docker in case something changed
+docker compose down
+docker compose build
+docker compose up -d
+
+
 ## Results
 ### Grafana
 http://<RASPBERRY_PI_IP>:3000
@@ -229,3 +235,5 @@ http://<RASPBERRY_PI_IP>:8000/metrics
 - Packet Rate: rate(tdma_packets_total[30s])
 - Sequence Tracking: tdma_sequence
 - Beacon Rate: rate(tdma_beacons_total[1m])
+
+
