@@ -1,6 +1,7 @@
 {
     "nrf-connect.applications": [
-        "${workspaceFolder}\\mac_tdma\\tdma"
+        "${workspaceFolder}\\mac_tdma\\tdma",
+        "c:\\Users\\tsr\\Desktop\\DECT\\mac_tdma\\tdma_thingy"
     ],
     "cmake.sourceDirectory": "C:/Users/tsr/Desktop/dect/mac_tdma/tdma"
 }
