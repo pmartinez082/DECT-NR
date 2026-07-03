@@ -408,7 +408,7 @@ static int dect_phy_mac_auto_client_cmd(const struct shell *shell, size_t argc, 
 	rach_params.tx_power_dbm = 0;
 	rach_params.mcs = 0;
 	rach_params.target_long_rd_id = 0;
-	rach_params.tx_id = 0;
+	rach_params.tx_id = current_settings->common.transmitter_id;
 	rach_params.interval_secs = 2;
 	rach_params.tdma_tx_iteration_multiplier = 4;
 	rach_params.tdma_tx_iteration_count = 50;
