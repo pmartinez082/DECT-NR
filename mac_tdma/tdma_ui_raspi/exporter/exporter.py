@@ -82,20 +82,12 @@ seq_queue = deque()
 # Regex
 # -------------------------------------------------
 
+PDC_LINE_RE = re.compile(
+    r"PDC\s+([\d.]+)\s+Seq:(\d+)\s+Tx:(\d+)\s+Temp:(\d+)"
+)
+
 BEACON_RE = re.compile(
-    r"Beacon TX callback fired:\s*frame_time=([\d.]+)\s*ms"
-)
-
-PDC_RE = re.compile(
-    r"PDC received at frame_time\s+([\d.]+)\s*ms"
-)
-
-SEQ_RE = re.compile(
-    r"Seq Nbr:\s*(\d+)"
-)
-
-DATA_RE = re.compile(
-    r"Tx:(\d+)\(0x[0-9a-fA-F]+\)\s+Temp:(\d+)\(0x[0-9a-fA-F]+\)"
+    r"Beacon fired:\s*frame_time=([\d.]+)\s*"
 )
 
 # -------------------------------------------------
@@ -140,18 +132,12 @@ def close_burst(tx_id):
 # -------------------------------------------------
 # Main parser
 # -------------------------------------------------
-
 def main():
     print("Starting Prometheus exporter on :8000")
-
     start_http_server(8000)
 
-    current_frame_time = None
-
     with open(LOG_FILE, "r") as f:
-
         for line in follow(f):
-
             line = line.strip()
 
             # Beacon
@@ -161,65 +147,48 @@ def main():
                 print(f"Beacon @ {m.group(1)} ms")
                 continue
 
-            # PDC
-            m = PDC_RE.search(line)
+            # Consolidated PDC line
+            m = PDC_LINE_RE.search(line)
             if m:
-                current_frame_time = float(m.group(1))
-                continue
-
-            # Sequence — push onto queue, tx_id not yet known
-            m = SEQ_RE.search(line)
-            if m:
-                seq_queue.append(int(m.group(1)))
-                continue
-
-            # TX/TEMP
-            m = DATA_RE.search(line)
-            if m:
-                tx_id = m.group(1)
-                temp  = int(m.group(2))
-
-                # Pop the oldest pending seq — it belongs to this tx_id
-                current_seq = seq_queue.popleft() if seq_queue else None
+                frame_time  = float(m.group(1))
+                current_seq = int(m.group(2))
+                tx_id       = m.group(3)   # keep as str for label consistency
+                temp        = int(m.group(4))
 
                 # --- Inter-message timing ---
                 delta = None
-                if current_frame_time is not None:
-                    if tx_id in last_message_time:
-                        delta = current_frame_time - last_message_time[tx_id]
-                        inter_message_gauge.labels(tx_id=tx_id).set(delta)
-                    last_message_time[tx_id] = current_frame_time
+                if tx_id in last_message_time:
+                    delta = frame_time - last_message_time[tx_id]
+                    inter_message_gauge.labels(tx_id=tx_id).set(delta)
+                last_message_time[tx_id] = frame_time
 
                 # --- Burst tracking by seq number per tx_id ---
-                if current_seq is not None:
-                    if tx_id not in current_burst_seq:
-                        # First packet for this tx_id
-                        current_burst_seq[tx_id] = current_seq
-                        burst_received[tx_id]    = 1
-                    elif current_seq != current_burst_seq[tx_id]:
-                        # Seq changed → close previous burst, start new one
-                        close_burst(tx_id)
-                        current_burst_seq[tx_id] = current_seq
-                        burst_received[tx_id]    = 1
-                    else:
-                        # Same burst
-                        burst_received[tx_id] = burst_received.get(tx_id, 0) + 1
+                if tx_id not in current_burst_seq:
+                    current_burst_seq[tx_id] = current_seq
+                    burst_received[tx_id]    = 1
+                elif current_seq != current_burst_seq[tx_id]:
+                    close_burst(tx_id)
+                    current_burst_seq[tx_id] = current_seq
+                    burst_received[tx_id]    = 1
+                else:
+                    burst_received[tx_id] = burst_received.get(tx_id, 0) + 1
 
                 # --- Other metrics ---
                 packet_counter.labels(tx_id=tx_id).inc()
                 temperature_gauge.labels(tx_id=tx_id).set(temp)
-
-                if current_seq is not None:
-                    seq_gauge.labels(tx_id=tx_id).set(current_seq)
-
-                if current_frame_time is not None:
-                    frame_time_gauge.labels(tx_id=tx_id).set(current_frame_time)
+                seq_gauge.labels(tx_id=tx_id).set(current_seq)
+                frame_time_gauge.labels(tx_id=tx_id).set(frame_time)
 
                 print(
                     f"TX={tx_id} SEQ={current_seq} TEMP={temp} "
                     f"DT={f'{delta:.3f}ms' if delta is not None else 'n/a'} "
                     f"burst_rx={burst_received.get(tx_id, 0)}"
                 )
+                continue
+
+            # unmatched lines (e.g. bare "PDC ...") fall through silently
+
+
 
 if __name__ == "__main__":
     main()

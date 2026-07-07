@@ -24,6 +24,7 @@
 #include "dect_phy_common_rx.h"
 #include "dect_phy_shell.h"
 #include "dect_phy_api_scheduler_integration.h"
+#include <zephyr/sys/atomic.h>
 
 #include "dect_phy_rx.h"
 #include "dect_phy_scan.h"
@@ -34,12 +35,39 @@
 #include "dect_phy_mac_nbr.h"
 #include "dect_phy_ctrl.h"
 
+#define DECT_STATS_LOG_STACK_SIZE 2048
 #define DECT_PHY_CTRL_STACK_SIZE 4096
 #define DECT_PHY_CTRL_PRIORITY	 K_PRIO_COOP(9) /* -7 */
+#define DECT_STATS_LOG_PRIORITY   K_PRIO_PREEMPT(10)  /* well below the ctrl thread */
+#define DECT_STATS_MSGQ_DEPTH 512
+
 K_THREAD_STACK_DEFINE(dect_phy_ctrl_th_stack, DECT_PHY_CTRL_STACK_SIZE);
+K_THREAD_STACK_DEFINE(dect_stats_log_stack, DECT_STATS_LOG_STACK_SIZE);
+
+
+struct k_thread dect_stats_log_thread_data;
+
 
 struct k_work_q dect_phy_ctrl_work_q;
 
+struct dect_pdc_stat_entry {
+	uint64_t time;
+	uint16_t tx_id;
+	uint16_t temp;
+	uint8_t  seq_nbr;
+};
+
+static void dect_stats_log_thread(void *p1, void *p2, void *p3);
+
+
+static atomic_t dect_stats_drop_count;
+void dect_stats_log_init(void)
+{
+	k_thread_create(&dect_stats_log_thread_data, dect_stats_log_stack,
+			DECT_STATS_LOG_STACK_SIZE, dect_stats_log_thread,
+			NULL, NULL, NULL, DECT_STATS_LOG_PRIORITY, 0, K_NO_WAIT);
+	k_thread_name_set(&dect_stats_log_thread_data, "dect_stats_log");
+}
 
 
 
@@ -106,8 +134,11 @@ K_SEM_DEFINE(dect_phy_ctrl_mdm_api_init_sema, 0, 1);
 K_SEM_DEFINE(dect_phy_ctrl_mdm_api_op_cancel_sema, 0, 1);
 K_SEM_DEFINE(dect_phy_ctrl_mdm_api_radio_mode_config_sema, 0, 1);
 K_MUTEX_DEFINE(dect_phy_ctrl_mdm_api_op_cancel_all_mutex);
+K_MSGQ_DEFINE(dect_stats_msgq, sizeof(struct dect_pdc_stat_entry), DECT_STATS_MSGQ_DEPTH, 4);
 
-/**************************************************************************************************/
+/*************************************************************************************************/
+
+
 
 static void dect_phy_rssi_channel_scan_completed_cb(enum nrf_modem_dect_phy_err phy_status);
 static void dect_phy_ctrl_on_modem_lib_init(int ret, void *ctx);
@@ -116,6 +147,44 @@ static int dect_phy_ctrl_phy_handlers_init(void);
 /**************************************************************************************************/
 
 K_MSGQ_DEFINE(dect_phy_ctrl_msgq, sizeof(struct dect_phy_common_op_event_msgq_item), 1000, 4);
+
+void dect_pdc_stat_capture(uint64_t time, uint16_t tx_id,
+					  uint16_t temp, uint8_t seq_nbr)
+{
+	struct dect_pdc_stat_entry entry = {
+		.time = time,
+		.tx_id = tx_id,
+		.temp = temp,
+		.seq_nbr = seq_nbr,
+	};
+
+	if (k_msgq_put(&dect_stats_msgq, &entry, K_NO_WAIT) != 0) {
+		atomic_inc(&dect_stats_drop_count);
+	}
+}
+
+
+
+static void dect_stats_log_thread(void *p1, void *p2, void *p3)
+{
+	struct dect_pdc_stat_entry entry;
+	static uint32_t last_reported_drops;
+
+	while (1) {
+		k_msgq_get(&dect_stats_msgq, &entry, K_FOREVER);
+
+		printk("PDC %.3f Seq:%u Tx:%u Temp:%u\n",
+		       MODEM_TICKS_TO_MS(entry.time), entry.seq_nbr,
+		       entry.tx_id, entry.temp);
+
+		uint32_t drops = atomic_get(&dect_stats_drop_count);
+		if (drops != last_reported_drops) {
+			printk("  [stats queue drops so far: %u]\n", drops);
+			last_reported_drops = drops;
+		}
+	}
+}
+
 
 int dect_phy_ctrl_msgq_non_data_op_add(uint16_t event_id)
 {
@@ -618,7 +687,8 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 				stats.pdc_received_frame_time_count++;
 
 				*/
-				desh_print("PDC received at frame_time %f ms", MODEM_TICKS_TO_MS(params->time));
+				//desh_print("PDC %f", MODEM_TICKS_TO_MS(params->time));
+
 				/*
 				desh_print("PDC received (time %llu): snr %d, RSSI-2 %d "
 					   "(RSSI %d), len %d",
@@ -910,9 +980,16 @@ static void dect_phy_ctrl_mdm_on_rx_pdc_cb(const struct nrf_modem_dect_phy_pdc_e
 			ctrl_data.ext_cmd.direct_pdc_rcv_cb(&ctrl_pdc_op_params);
 		}
 
-		dect_phy_ctrl_msgq_data_op_add(DECT_PHY_CTRL_OP_PHY_API_MDM_RX_PDC_DATA,
-					       (void *)&ctrl_pdc_op_params,
-					       sizeof(struct dect_phy_commmon_op_pdc_rcv_params));
+		int ret = dect_phy_ctrl_msgq_data_op_add(DECT_PHY_CTRL_OP_PHY_API_MDM_RX_PDC_DATA,
+			       (void *)&ctrl_pdc_op_params,
+			       sizeof(struct dect_phy_commmon_op_pdc_rcv_params));
+		if (ret) {
+			static uint32_t drop_count;
+			drop_count++;
+			if ((drop_count % 10) == 0) {
+				printk("PDC ENQUEUE DROP count=%u ret=%d\n", drop_count, ret);
+			}
+		}
 	} else {
 		printk("Received data is too long to be received by CTRL TH - discarded (len %d, "
 		       "buf size %d)\n",
@@ -1853,13 +1930,14 @@ static int dect_phy_ctrl_init(void)
 	memset(&ctrl_data, 0, sizeof(struct dect_phy_ctrl_data));
 	ctrl_data.last_valid_temperature = NRF_MODEM_DECT_PHY_TEMP_NOT_MEASURED;
 
-	ctrl_data.debug = true; /* Debugs enabled as a default */
+	ctrl_data.debug = true;
 	k_work_queue_start(&dect_phy_ctrl_work_q, dect_phy_ctrl_th_stack,
 			   K_THREAD_STACK_SIZEOF(dect_phy_ctrl_th_stack), DECT_PHY_CTRL_PRIORITY,
 			   NULL);
 	k_thread_name_set(&(dect_phy_ctrl_work_q.thread), "dect_phy_ctrl_worker_th");
 
+	dect_stats_log_init();   /* <-- add this */
+
 	return 0;
 }
-
 SYS_INIT(dect_phy_ctrl_init, APPLICATION, CONFIG_KERNEL_INIT_PRIORITY_DEVICE);

@@ -308,7 +308,7 @@ static void dect_phy_mac_common_header_print(dect_phy_mac_type_header_t *type_he
 			   common_header->transmitter_id, common_header->transmitter_id);
 	} else {
 		desh_print("      Reset: %s", (common_header->reset > 0) ? "yes" : "no");
-		desh_print("      Seq Nbr: %u", common_header->seq_nbr);
+		desh_print("Seq Nbr: %u", common_header->seq_nbr);
 
 		if (type_header->type == DECT_PHY_MAC_HEADER_TYPE_UNICAST) {
 			desh_print("      Receiver: %u (0x%08x)", common_header->receiver_id,

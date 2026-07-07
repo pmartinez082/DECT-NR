@@ -618,7 +618,7 @@ static void dect_phy_ctrl_msgq_thread_handler(void)
 				stats.pdc_received_frame_time_count++;
 
 				*/
-				desh_print("PDC received at frame_time %f ms", MODEM_TICKS_TO_MS(params->time));
+				desh_print("PDC %f", MODEM_TICKS_TO_MS(params->time));
 				/*
 				desh_print("PDC received (time %llu): snr %d, RSSI-2 %d "
 					   "(RSSI %d), len %d",

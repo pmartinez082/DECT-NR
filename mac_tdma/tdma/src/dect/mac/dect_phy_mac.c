@@ -24,33 +24,20 @@
 #include "dect_phy_mac_client.h"
 #include "dect_phy_mac.h"
 
+
 /**************************************************************************************************/
 
 static void dect_phy_mac_message_print(dect_phy_mac_message_type_t message_type,
-				       dect_phy_mac_message_t *message)
+				       dect_phy_mac_message_t *message, uint64_t time, uint8_t seq_nbr)
 {
 	switch (message_type) {
 	case DECT_PHY_MAC_MESSAGE_TYPE_DATA_SDU: {
-		unsigned char ascii_data[DECT_DATA_MAX_LEN];
+	uint16_t tx_id = ((uint16_t)message->data_sdu.data[0] << 8) | message->data_sdu.data[1];
+	uint16_t temp  = ((uint16_t)message->data_sdu.data[2] << 8) | message->data_sdu.data[3];
 
-		memcpy(ascii_data, message->data_sdu.data, message->data_sdu.data_length);
-		ascii_data[message->data_sdu.data_length] = '\0';
-		uint16_t tx_id = ((uint16_t)message->data_sdu.data[0] << 8) | message->data_sdu.data[1];
-		uint16_t temp  = ((uint16_t)message->data_sdu.data[2] << 8) | message->data_sdu.data[3];
-
-printk("Tx:%u(0x%04x) Temp:%u(0x%04x)\n",
-       tx_id, tx_id,
-       temp, temp);
-/*
-		desh_print("        DLC IE type: %s (0x%02x)",
-			   dect_phy_mac_dlc_pdu_ie_type_string_get(message->data_sdu.dlc_ie_type),
-			   message->data_sdu.dlc_ie_type);
-		desh_print("        Received data, len %d, payload as ascii string print:\n"
-			   "          %s",
-			   message->data_sdu.data_length, ascii_data);
-			   */
-		break;
-	}
+	dect_pdc_stat_capture(time, tx_id, temp, seq_nbr);
+	break;
+}
 
 	case DECT_PHY_MAC_MESSAGE_TYPE_ASSOCIATION_REQ: {
 		desh_print("      Received Association Request message:");
@@ -292,15 +279,7 @@ printk("Tx:%u(0x%04x) Temp:%u(0x%04x)\n",
 		break;
 	}
 }
-static void dect_phy_mac_print_tdma_info(
-					     dect_phy_mac_common_header_t *common_header, 
-					 uint64_t time){
 
-		desh_print("PDC received at frame_time %f ms", MODEM_TICKS_TO_MS(time));
-	
-	
-
-}
 
 static void dect_phy_mac_type_header_print(dect_phy_mac_type_header_t *type_header)
 {
@@ -324,7 +303,7 @@ static void dect_phy_mac_common_header_print(dect_phy_mac_type_header_t *type_he
 		desh_print("      Transmitter ID:          %u (0x%08x)",
 			   common_header->transmitter_id, common_header->transmitter_id);
 	} else {
-		desh_print("      Seq Nbr: %u", common_header->seq_nbr);
+		desh_print("Seq Nbr: %u", common_header->seq_nbr);
 
 		if (type_header->type == DECT_PHY_MAC_HEADER_TYPE_UNICAST) {
 			desh_print("      Receiver: %u (0x%08x)", common_header->receiver_id,
@@ -356,11 +335,11 @@ static void dect_phy_mac_mux_header_print(dect_phy_mac_mux_header_t *mux_header)
 	}*/
 }
 
-static void dect_phy_mac_sdu_print(dect_phy_mac_sdu_t *sdu_list_item, int sdu_nbr)
+static void dect_phy_mac_sdu_print(dect_phy_mac_sdu_t *sdu_list_item, int sdu_nbr, uint64_t time, uint8_t seq_nbr)
 {
 	//desh_print("  SDU %u:", sdu_nbr);
 	//dect_phy_mac_mux_header_print(&sdu_list_item->mux_header);
-	dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message);
+	dect_phy_mac_message_print(sdu_list_item->message_type, &sdu_list_item->message, time, seq_nbr);
 }
 
 bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
@@ -413,7 +392,6 @@ bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
 			*/
 
 	
-		dect_phy_mac_print_tdma_info(&type_header, rcv_params->time);
 
 		//dect_phy_mac_type_header_print(&type_header);
 	}
@@ -432,9 +410,6 @@ bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
 		}
 		desh_error("Failed to decode MAC Common header");
 		return false;
-	}
-	if (print) {
-		dect_phy_mac_common_header_print(&type_header, &common_header);
 	}
 
 	sys_dlist_t sdu_list;
@@ -455,7 +430,7 @@ bool dect_phy_mac_handle(struct dect_phy_commmon_op_pdc_rcv_params *rcv_params)
 
 		SYS_DLIST_FOR_EACH_CONTAINER(&sdu_list, sdu_list_item, dnode) {
 			if (print) {
-				dect_phy_mac_sdu_print(sdu_list_item, ++sdu_count);
+				dect_phy_mac_sdu_print(sdu_list_item, ++sdu_count, rcv_params->time, common_header.seq_nbr);
 			}
 
 			if (sdu_list_item->message_type ==

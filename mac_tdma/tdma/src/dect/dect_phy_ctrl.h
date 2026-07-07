@@ -183,5 +183,6 @@ void dect_phy_ctrl_mdm_cancel_cb(const struct nrf_modem_dect_phy_cancel_event *e
 void dect_phy_ctrl_mdm_configure_cb(const struct nrf_modem_dect_phy_configure_event *evt);
 void dect_phy_ctrl_mdm_on_capability_get_cb(
 	const struct nrf_modem_dect_phy_capability_get_event *evt);
-
+void dect_pdc_stat_capture(uint64_t time, uint16_t tx_id, uint16_t temp, uint8_t seq_nbr);
+void dect_stats_log_init(void);
 #endif /* DECT_PHY_CTRL_H */

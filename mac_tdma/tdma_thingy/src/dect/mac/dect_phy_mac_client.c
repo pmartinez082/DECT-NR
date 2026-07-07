@@ -551,13 +551,13 @@ static int dect_phy_mac_client_tdma_data_tx(
     uint64_t beacon_ref = target_nbr->time_rcvd_mdm_ticks;
     uint64_t beacon_age = (now >= beacon_ref) ? (now - beacon_ref) : 0;
 
-    
+ /*   
     if (beacon_age > (20 * beacon_interval_ticks)) {
         desh_warn("(%s): Beacon timing too stale for TDMA (age=%llu ticks, interval=%llu ticks)",
                   __func__, beacon_age, beacon_interval_ticks);
         return -EAGAIN;
     }
-
+*/
     uint64_t next_superframe_start = beacon_ref;
 
     if (first_possible > beacon_ref) {
@@ -629,8 +629,10 @@ static int dect_phy_mac_client_tdma_data_tx(
             return -EBUSY;
         }
 
+       		if  (tx_iteration == params->tdma_tx_iteration_count - 1) {
         desh_print("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u", 
                    tx_iteration, conf_iter->start_slot, iter_frame_time, encoded_pdu_length);
+   		}
     }
 
     return 0;
