@@ -20,6 +20,11 @@ DOWNSAMPLE = 5         # vlines reduction factor
 OFFSET = 700          # wait for both clients to converge
 
 '''
+PDC_LINE_RE = re.compile(
+    r"PDC\s+([\d.]+)\s+Seq:(\d+)\s+Tx:(\d+)\s+Temp:(\d+)"
+)
+
+first_msg_time = None  # will be set to first PDC frame_time
 
 def parse_master_log(log_file):
     if not Path(log_file).exists():
@@ -32,109 +37,45 @@ def parse_master_log(log_file):
         lines = f.readlines()
 
     # -------------------------------------------------
-    # Find first beacon
+    # Find first reference time (first PDC frame_time)
     # -------------------------------------------------
-    first_beacon_time = None
-
-    for line in lines:
-        m = re.search(
-            r"Beacon TX callback fired:\s*frame_time=([\d.]+)\s*ms",
-            line
-        )
-
-        if m:
-            first_beacon_time = float(m.group(1))
-            print(f"Found first beacon at: {first_beacon_time} ms")
-            break
-
-    if first_beacon_time is None:
-        print("No beacon found in log")
-        return []
-
-    # -------------------------------------------------
-    # Parse log
-    # -------------------------------------------------
-    current_pdc = None
-
+    global first_msg_time
     for raw_line in lines:
         line = raw_line.strip()
 
         if not line:
             continue
 
-        # -------------------------------------------------
-        # Beacon
-        # -------------------------------------------------
-        m = re.search(
-            r"Beacon TX callback fired:\s*frame_time=([\d.]+)\s*ms",
-            line
-        )
-
+        m = PDC_LINE_RE.search(line)
         if m:
-            beacon_time = float(m.group(1)) - first_beacon_time
+            first_msg_time = float(m.group(1))
+            break
 
+    # -------------------------------------------------
+    # Parse log — one PDC record per line now
+    # -------------------------------------------------
+    for raw_line in lines:
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        
+        # PDC data (single consolidated line: PDC <time> Seq:<n> Tx:<n> Temp:<n>)
+        m = PDC_LINE_RE.search(line)
+        if m:
             records.append({
-                "frame_time": beacon_time,
-                "beacon": True,
-                "seq": None,
-                "tx_id": 0,
-                "temperature": None
-            })
-
-            continue
-
-        # -------------------------------------------------
-        # PDC start
-        # -------------------------------------------------
-        m = re.search(
-            r"PDC received at frame_time\s+([\d.]+)\s*ms",
-            line
-        )
-
-        if m:
-            current_pdc = {
-                "frame_time": float(m.group(1)) - first_beacon_time,
+                "frame_time": float(m.group(1)) - first_msg_time,
                 "beacon": False,
-                "seq": None,
-                "tx_id": None,
-                "temperature": None
-            }
-
+                "seq": int(m.group(2)),
+                "tx_id": int(m.group(3)),
+                "temperature": int(m.group(4)),
+            })
             continue
 
-        if current_pdc is None:
-            continue
-
-        # -------------------------------------------------
-        # Sequence number
-        # -------------------------------------------------
-        m = re.search(r"Seq Nbr:\s*(\d+)", line, re.IGNORECASE)
-
-        if m:
-            current_pdc["seq"] = int(m.group(1))
-            continue
-
-        # -------------------------------------------------
-        # Compact TX/TEMP line
-        # Example:
-        # Tx:2(0x0002) Temp:33(0x0021)
-        # -------------------------------------------------
-        m = re.search(
-            r"Tx:(\d+)\(0x[0-9a-fA-F]+\)\s+Temp:(\d+)\(0x[0-9a-fA-F]+\)",
-            line
-        )
-
-        if m:
-            current_pdc["tx_id"] = int(m.group(1))
-            current_pdc["temperature"] = int(m.group(2))
-
-            records.append(current_pdc)
-            current_pdc = None
-
-            continue
+        # anything else (e.g. bare "PDC 50860.737052" with no Seq/Tx/Temp) is skipped
 
     return records
-
 
 def save_to_csv(records, csv_file):
     if not records:
