@@ -109,10 +109,15 @@ def follow(file):
 # -------------------------------------------------
 # Helpers
 # -------------------------------------------------
+BURST_SIZE = 50
+BURST_DURATION_MS = 2000.0
+BURST_TOLERANCE_MS = 400.0   # generous margin for jitter
+
+burst_start_time = {}  # tx_id -> frame_time when current burst window began
 
 def close_burst(tx_id):
     received = burst_received.get(tx_id, 0)
-    lost     = BURST_SIZE - received
+    lost     = max(BURST_SIZE - received, 0)
 
     burst_per = lost / BURST_SIZE
     burst_per_gauge.labels(tx_id=tx_id).set(burst_per)
@@ -128,7 +133,6 @@ def close_burst(tx_id):
         f"received={received}/{BURST_SIZE} lost={lost} "
         f"burst_PER={burst_per:.4f} cum_PER={cum_per:.4f}"
     )
-
 # -------------------------------------------------
 # Main parser
 # -------------------------------------------------
@@ -163,15 +167,21 @@ def main():
                 last_message_time[tx_id] = frame_time
 
                 # --- Burst tracking by seq number per tx_id ---
-                if tx_id not in current_burst_seq:
+                if tx_id not in burst_start_time:
+                    # first packet ever seen for this tx
+                    burst_start_time[tx_id]  = frame_time
                     current_burst_seq[tx_id] = current_seq
                     burst_received[tx_id]    = 1
-                elif current_seq != current_burst_seq[tx_id]:
+                elif frame_time - burst_start_time[tx_id] >= (BURST_DURATION_MS - BURST_TOLERANCE_MS):
+                    # enough time has elapsed that this packet must belong to a NEW burst window
                     close_burst(tx_id)
+                    burst_start_time[tx_id]  = frame_time
                     current_burst_seq[tx_id] = current_seq
                     burst_received[tx_id]    = 1
                 else:
+                    # still within the current burst's time window
                     burst_received[tx_id] = burst_received.get(tx_id, 0) + 1
+                    current_burst_seq[tx_id] = current_seq
 
                 # --- Other metrics ---
                 packet_counter.labels(tx_id=tx_id).inc()
