@@ -172,7 +172,7 @@ static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_par
 	/* Let there be some advance at both ends */
 	sche_list_item_conf->frame_time =
 		next_beacon_frame_start - (5 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS);
-	sche_list_item_conf->rx.duration = 15 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
+	sche_list_item_conf->rx.duration = 3 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
 	sche_list_item_conf->length_slots = 0;
 	sche_list_item_conf->length_subslots = 0;
 	sche_list_item_conf->start_slot = 0;
