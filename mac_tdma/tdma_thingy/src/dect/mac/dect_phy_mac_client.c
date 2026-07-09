@@ -630,7 +630,7 @@ static int dect_phy_mac_client_tdma_data_tx(
         }
 
        		if  (tx_iteration == params->tdma_tx_iteration_count - 1) {
-        desh_print("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u", 
+        desh_print("TDMA TX[%d] scheduled slot=%u frame=%f len=%u", 
                    tx_iteration, conf_iter->start_slot, MODEM_TICKS_TO_MS(iter_frame_time), encoded_pdu_length);
    		}
     }

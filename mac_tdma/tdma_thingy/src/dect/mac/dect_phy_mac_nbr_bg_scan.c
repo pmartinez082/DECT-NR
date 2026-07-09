@@ -179,10 +179,8 @@ static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_par
 
 	sche_list_item_conf->channel = params->target_nbr->channel;
 
-	/* Note: this is not exactly compliant with the MAC spec (which requires for every beacon
-	 * in release 1.x
-	 */
-	sche_list_item_conf->interval_mdm_ticks = beacon_interval_mdm_ticks * 10;
+
+	sche_list_item_conf->interval_mdm_ticks = beacon_interval_mdm_ticks;
 
 	sche_list_item_conf->cb_op_completed = dect_phy_mac_nbr_bg_scan_scheduler_op_completed_cb;
 	sche_list_item_conf->cb_op_to_mdm = dect_phy_mac_nbr_bg_scan_scheduler_op_to_mdm_cb;
