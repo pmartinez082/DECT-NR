@@ -232,6 +232,7 @@ def print_seq_stats(df):
     # -------------------------------------------------
     PERIOD_MS   = 40.0
     TOLERANCE   = PERIOD_MS / 2.0   # 20 ms match window
+    '''
     print(f"\n=== Batch inter-frame timing (batch_size={BATCH_SIZE}, period={PERIOD_MS} ms) ===")
 
     pdc_sorted = pdc.sort_values(["tx_id", "frame_time"]).copy()
@@ -398,7 +399,7 @@ def print_seq_stats(df):
     stats_csv = "tdma_batch_stats.csv"
     stats_df.to_csv(stats_csv, index=False)
     print(f"\nSaved batch stats -> {stats_csv}")
-
+    '''
 
 
 def main():
