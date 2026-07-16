@@ -152,7 +152,6 @@ int startup_cmd_settings_init(void)
 	}
 
 
-
 	err = settings_subsys_init();
 	if (err) {
 		desh_error("(%s): Failed to initialize settings subsystem, error: %d",
