@@ -347,7 +347,6 @@ show_usage:
 	desh_print_no_format(dect_phy_mac_associate_cmd_usage_str);
 	return 0;
 }
-
 static const char dect_phy_mac_auto_client_cmd_usage_str[] =
 	"Usage: dect mac auto_client [<options>]\n"
 	"Scan channel for a beacon, associate to the first found master, wait, and start RACH TX.\n"
@@ -409,7 +408,7 @@ static int dect_phy_mac_auto_client_cmd(const struct shell *shell, size_t argc, 
 	rach_params.mcs = 0;
 	rach_params.target_long_rd_id = 0;
 	rach_params.tx_id = current_settings->common.transmitter_id;
-	rach_params.interval_secs = 2;
+	rach_params.interval_secs = 0;
 	rach_params.tdma_tx_iteration_multiplier = 4;
 	rach_params.tdma_tx_iteration_count = 50;
 	rach_params.get_mdm_temp = false;
