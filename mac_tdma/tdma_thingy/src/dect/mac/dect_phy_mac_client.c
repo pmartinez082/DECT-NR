@@ -582,6 +582,7 @@ static int dect_phy_mac_client_tdma_data_tx(
 	desh_print("multiplier=%u count=%u", params->tdma_tx_iteration_multiplier, params->tdma_tx_iteration_count);
 	/* Schedules the tx iterations for the assigned slot(s) using the configured
 	 * multiplier to space each iteration by the requested number of 10ms frames. */
+	uint8_t failed_count = 0;
     for (int tx_iteration = 0; tx_iteration < params->tdma_tx_iteration_count; tx_iteration++) {
         struct dect_phy_api_scheduler_list_item_config *conf_iter;
         struct dect_phy_api_scheduler_list_item *item_iter =
@@ -624,17 +625,23 @@ static int dect_phy_mac_client_tdma_data_tx(
         item_iter->priority = DECT_PRIORITY1_TX;
         item_iter->phy_op_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE + tx_iteration;
 
-        if (!dect_phy_api_scheduler_list_item_add(item_iter)) {
-            dect_phy_api_scheduler_list_item_dealloc(item_iter);
-            return -EBUSY;
-        }
+         if (!dect_phy_api_scheduler_list_item_add(item_iter)) {
+        failed_count++;
+        printk("TDMA TX[%d] FAILED to schedule (slot conflict?)\n", tx_iteration);
+        dect_phy_api_scheduler_list_item_dealloc(item_iter);
+    }
 
-       		if  (tx_iteration == params->tdma_tx_iteration_count - 1) {
-        desh_print("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u", 
-                   tx_iteration, conf_iter->start_slot, iter_frame_time, encoded_pdu_length);
+	
+       	if  (tx_iteration == params->tdma_tx_iteration_count - 1) {
+        printk("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u",tx_iteration, conf_iter->start_slot, iter_frame_time, encoded_pdu_length);
 
    		}
-    }
+		
+		
+	}
+	printk("TDMA TX cycle: %d/%d iterations scheduled successfully\n",
+       params->tdma_tx_iteration_count - failed_count, params->tdma_tx_iteration_count);
+
 
     return 0;
 }

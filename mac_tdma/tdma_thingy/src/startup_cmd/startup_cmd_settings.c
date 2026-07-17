@@ -146,12 +146,10 @@ int startup_cmd_settings_init(void)
 	memset(&startup_cmd_data, 0, sizeof(startup_cmd_data));
 	startup_cmd_data.starttime = 2;
 	strcpy(startup_cmd_data.cmd[0].cmd_str,
-	       "dect mac auto_client -c 1677 -s 4 -p 0 -m 0 -i 4 -d auto -q 4 -r 50 -w 20");
+	       "dect mac auto_client -c 1677 -s 4 -p 0 -m 0 -i 2 -d auto -q 4 -r 25 -w 20");
 	for (int i = 0; i < STARTUP_CMD_MAX_COUNT; i++) {
 		startup_cmd_data.cmd[i].delay = STARTUP_CMD_DELAY_DEFAULT;
 	}
-
-
 	err = settings_subsys_init();
 	if (err) {
 		desh_error("(%s): Failed to initialize settings subsystem, error: %d",

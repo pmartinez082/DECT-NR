@@ -216,7 +216,7 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 /* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
  * resources.
  */
-#define MAX_RACH_RX_ITEMS 99
+#define MAX_RACH_RX_ITEMS 10
 
 
 

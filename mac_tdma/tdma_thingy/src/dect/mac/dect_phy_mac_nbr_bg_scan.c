@@ -204,14 +204,13 @@ static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_par
 
 	/* Let there be some advance at both ends */
 	sche_list_item_conf->frame_time =
-		next_beacon_frame_start - (6 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS);
-	sche_list_item_conf->rx.duration = 7 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
+		next_beacon_frame_start - 50*DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
+	sche_list_item_conf->rx.duration =50*DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
 	sche_list_item_conf->length_slots = 0;
 	sche_list_item_conf->length_subslots = 0;
 	sche_list_item_conf->start_slot = 0;
-
 	sche_list_item_conf->channel = params->target_nbr->channel;
-
+	
 	/* Note: this is not exactly compliant with the MAC spec (which requires for every beacon
 	 * in release 1.x
 	 */
