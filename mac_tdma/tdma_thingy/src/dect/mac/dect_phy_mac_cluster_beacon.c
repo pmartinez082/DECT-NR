@@ -980,7 +980,8 @@ int64_t dect_phy_mac_cluster_beacon_rcv_time_shift_calculate(
 	uint64_t last_rcv_time,
 	uint64_t now_rcv_time)
 {
-	__ASSERT_NO_MSG(last_rcv_time < now_rcv_time);
+	printk("last_rcv_time: %lld, now_rcv_time: %lld", last_rcv_time, now_rcv_time);
+	__ASSERT_NO_MSG(last_rcv_time <= now_rcv_time);
 
 	uint64_t next_beacon_frame_start, beacon_interval_mdm_ticks, prev_frame_start;
 	uint64_t now_diff_to_prev_frame;

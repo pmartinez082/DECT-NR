@@ -88,6 +88,47 @@ static void dect_phy_mac_client_tdma_tx_scheduler_items_clear(uint8_t iteration_
 
     tdma_tx_iteration_count_last = iteration_count;
 }
+/* Add near the top with other statics */
+static uint64_t dect_phy_mac_client_next_retrigger_delay_ms_get(
+    struct dect_phy_mac_nbr_info_list_item *target_nbr, uint16_t interval_secs)
+{
+    uint64_t now = dect_app_modem_time_now();
+    uint64_t beacon_ref = target_nbr->time_rcvd_mdm_ticks;
+
+    int32_t beacon_interval_ms = dect_phy_mac_pdu_cluster_beacon_period_in_ms(
+        target_nbr->beacon_msg.cluster_beacon_period);
+    if (beacon_interval_ms <= 0) {
+        return interval_secs * 1000; /* fallback */
+    }
+    uint64_t beacon_interval_ticks = MS_TO_MODEM_TICKS(beacon_interval_ms);
+
+    /* Desired retrigger cadence in modem ticks (rounded to nearest whole
+     * superframe so it always lands on a boundary, not between them) */
+    uint64_t requested_ticks = MS_TO_MODEM_TICKS((uint64_t)interval_secs * 1000);
+    uint64_t superframes = requested_ticks / beacon_interval_ticks;
+    if (superframes == 0) {
+        superframes = 1;
+    }
+    uint64_t cadence_ticks = superframes * beacon_interval_ticks;
+
+    /* Find the next boundary at or after (beacon_ref + cadence_ticks) that is
+     * still ahead of "now", anchored to the real beacon reference rather than
+     * to whenever this function happens to be called. */
+    uint64_t next_boundary = beacon_ref;
+    while (next_boundary <= now) {
+        next_boundary += cadence_ticks;
+    }
+
+    uint64_t delay_ticks = next_boundary - now;
+    uint64_t delay_ms = MODEM_TICKS_TO_MS(delay_ticks);
+
+    /* Small safety margin so the worker fires comfortably before the
+     * boundary rather than racing it. */
+    if (delay_ms > 50) {
+        delay_ms -= 50;
+    }
+    return delay_ms;
+}
 
 /* Function to set the assigned slot from the association response */
 void dect_phy_mac_client_set_assigned_slot(uint8_t assigned_slot_start)
@@ -308,7 +349,9 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 	while (next_beacon_frame_start < first_possible_tx) {
 		next_beacon_frame_start += beacon_interval_mdm_ticks;
 	}
-
+	ra_interval_mdm_ticks = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
+	last_valid_rach_rx_frame_time = next_beacon_frame_start;
+/*
 	if (target_nbr->ra_ie.repeat == DECT_PHY_MAC_RA_REPEAT_TYPE_SINGLE) {
 		ra_interval_mdm_ticks = beacon_interval_mdm_ticks;
 		last_valid_rach_rx_frame_time = next_beacon_frame_start;
@@ -326,6 +369,7 @@ static uint64_t dect_phy_mac_client_next_rach_tx_time_get(
 			next_beacon_frame_start +
 			(target_nbr->ra_ie.validity * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
 	}
+			*/
 
 	/* Apply optional additional delay for our beacon only if it doesn't
 	 * push the TX beyond the last valid RACH RX frame time. This keeps
@@ -448,9 +492,12 @@ static void dect_phy_mac_client_rach_tx_worker(struct k_work *work_item)
 	}
 
 	if (cmd_params.interval_secs) {
-		k_work_schedule_for_queue(&dect_phy_ctrl_work_q,
-					  &client_rach_tx_work_data.work,
-					  K_SECONDS(cmd_params.interval_secs));
+    uint64_t delay_ms = dect_phy_mac_client_next_retrigger_delay_ms_get(
+        &data->target_nbr, cmd_params.interval_secs);
+
+    k_work_schedule_for_queue(&dect_phy_ctrl_work_q,
+                  &client_rach_tx_work_data.work,
+                  K_MSEC(delay_ms));
 	}
 }
 
@@ -508,6 +555,17 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     memset(encoded_data_to_send, 0, sizeof(encoded_data_to_send));
 
+	uint32_t last_handle = DECT_PHY_MAC_CLIENT_TDMA_TX_HANDLE + (tdma_tx_iteration_count_last - 1);
+
+	if (tdma_tx_iteration_count_last > 0 &&
+		dect_phy_api_scheduler_list_item_running_by_phy_op_handle(last_handle)) {
+		/* Previous burst's tail is still in flight - reschedule shortly
+		* instead of firing now and risking a modem-level conflict. */
+		k_work_schedule_for_queue(&dect_phy_ctrl_work_q,
+					&client_rach_tx_work_data.work, K_MSEC(20));
+		return 0;
+		}
+
     uint16_t seq_nbr = client_data.client_seq_nbr++;
 
     int ret = dect_phy_mac_client_data_pdu_encode(
@@ -534,9 +592,9 @@ static int dect_phy_mac_client_tdma_data_tx(
         US_TO_MODEM_TICKS(current_settings->scheduler.scheduling_delay_us);
     uint64_t frame_duration = DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS;
 
-   
+   	uint64_t beacon_ref = target_nbr->time_rcvd_mdm_ticks;
     uint64_t first_possible = now + latency + guard + frame_duration;
-
+	
     int32_t beacon_interval_ms = dect_phy_mac_pdu_cluster_beacon_period_in_ms(
         target_nbr->beacon_msg.cluster_beacon_period);
     if (beacon_interval_ms <= 0) {
@@ -548,8 +606,9 @@ static int dect_phy_mac_client_tdma_data_tx(
         DECT_RADIO_FRAME_SLOT_COUNT;
     uint8_t slot_in_frame = tdma_client_state.assigned_slot_start;
 
-    uint64_t beacon_ref = target_nbr->time_rcvd_mdm_ticks;
+    
     uint64_t beacon_age = (now >= beacon_ref) ? (now - beacon_ref) : 0;
+
 
  /*   
     if (beacon_age > (20 * beacon_interval_ticks)) {
@@ -577,6 +636,8 @@ static int dect_phy_mac_client_tdma_data_tx(
     while (tx_frame_time < first_possible) {
         tx_frame_time += beacon_interval_ticks;
     }
+	
+
 	
 	dect_phy_mac_client_tdma_tx_scheduler_items_clear(params->tdma_tx_iteration_count);
 	desh_print("multiplier=%u count=%u", params->tdma_tx_iteration_multiplier, params->tdma_tx_iteration_count);
@@ -633,7 +694,7 @@ static int dect_phy_mac_client_tdma_data_tx(
 
 	
        	if  (tx_iteration == params->tdma_tx_iteration_count - 1) {
-        printk("TDMA TX[%d] scheduled slot=%u frame=%llu len=%u",tx_iteration, conf_iter->start_slot, iter_frame_time, encoded_pdu_length);
+        printk("TDMA TX[%d] scheduled slot=%u frame=%.3f len=%u, beacon_ref=%.3f, now=%.3f, beacon_interval_ms=%.3f, beacon_age=%d",(tx_iteration), conf_iter->start_slot, MODEM_TICKS_TO_MS(conf_iter->frame_time), encoded_pdu_length, MODEM_TICKS_TO_MS(beacon_ref), MODEM_TICKS_TO_MS(now), (beacon_interval_ms), MODEM_TICKS_TO_MS(beacon_age));
 
    		}
 		
@@ -645,6 +706,8 @@ static int dect_phy_mac_client_tdma_data_tx(
 
     return 0;
 }
+
+
 /* RACH TX: Random Access Channel transmission for association */
 static int dect_phy_mac_client_rach_tx(struct dect_phy_mac_nbr_info_list_item *target_nbr,
 				struct dect_phy_mac_rach_tx_params *params)
@@ -1381,7 +1444,7 @@ static int dect_phy_mac_client_dissociate_msg_send(
 		dect_phy_api_scheduler_list_item_dealloc(sched_list_item);
 		return -EBUSY;
 	}
-
+	/*
 	desh_print("Scheduled random access data TX/RX:\n"
 		   "  target long rd id %u (0x%08x), short rd id %u (0x%04x),\n"
 		   "  target 32bit nw id %u (0x%08x), tx pwr %d dbm,\n"
@@ -1391,7 +1454,7 @@ static int dect_phy_mac_client_dissociate_msg_send(
 		   target_nbr->short_rd_id, target_nbr->nw_id_32bit, target_nbr->nw_id_32bit,
 		   params->tx_power_dbm, target_nbr->channel, encoded_pdu_length,
 		   beacon_interval_ms, sched_list_item_conf->frame_time, beacon_received);
-
+*/
 	return 0;
 }
 
@@ -1455,6 +1518,8 @@ void dect_phy_mac_client_status_print(void)
 		}
 	}
 }
+
+
 
 static int dect_phy_mac_client_init(void)
 {

@@ -94,8 +94,7 @@ static void dect_phy_mac_nbr_bg_scan_pdc_received_cb(uint64_t time, uint8_t *dat
 						      uint32_t data_length,
 						      int16_t rx_rssi_dbm, int16_t rx_pwr_dbm)
 {
-		printk("BG SCAN PDC CB FIRED: time=%llu len=%u rssi=%d pwr=%d\n",
-	       time, data_length, rx_rssi_dbm, rx_pwr_dbm);
+		
 	struct dect_phy_commmon_op_pdc_rcv_params pdc_params = { 0 };
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
 	uint32_t copy_len;
@@ -115,6 +114,8 @@ static void dect_phy_mac_nbr_bg_scan_pdc_received_cb(uint64_t time, uint8_t *dat
 		(uint8_t)(current_settings->common.network_id & 0xFF);
 	pdc_params.rx_status.rssi_2 = rx_rssi_dbm * 2;
 	pdc_params.rx_status.handle = 0;
+	printk("BG SCAN PDC CB FIRED: time=%llu len=%u rssi=%d pwr=%d\n",
+	       time, copy_len, rx_rssi_dbm, rx_pwr_dbm);
 
 	dect_phy_mac_handle(&pdc_params);
 }
@@ -146,6 +147,7 @@ static void dect_phy_mac_nbr_bg_scan_scheduler_op_completed_cb(
 			};
 
 			bg_scan_data->params.cb_op_completed(&completed_info);
+			printk("Beacon at %.3f", MODEM_TICKS_TO_MS(bg_scan_data->last_updated_rcv_time_mdm_ticks));
 		}
 	}
 	dect_phy_ctrl_msgq_non_data_op_add(DECT_PHY_CTRL_OP_DEBUG_ON);
@@ -156,8 +158,7 @@ static void dect_phy_mac_nbr_bg_scan_scheduler_op_completed_cb(
 	} else {
 		bg_scan_data->metrics.scan_start_fail_count++;
 	}
-	printk("BG SCAN op_completed: status=%d time_from_last_received_ms=%lld\n",
-	       params->status, time_from_last_received_ms);
+	//printk("BG SCAN op_completed: status=%d time_from_last_received_ms=%lld\n",params->status, time_from_last_received_ms);
 }
 
 static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_params *params)
@@ -201,16 +202,15 @@ static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_par
 	sche_list_item_conf->rx.filter.is_short_network_id_used = false;
 	sche_list_item_conf->rx.network_id = 0;
 	sche_list_item_conf->rx.filter.receiver_identity = 0;
-
 	/* Let there be some advance at both ends */
 	sche_list_item_conf->frame_time =
-		next_beacon_frame_start - 50*DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
-	sche_list_item_conf->rx.duration =50*DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
+		next_beacon_frame_start - (5 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS);
+	sche_list_item_conf->rx.duration = 10 * DECT_RADIO_SLOT_DURATION_IN_MODEM_TICKS;
 	sche_list_item_conf->length_slots = 0;
 	sche_list_item_conf->length_subslots = 0;
 	sche_list_item_conf->start_slot = 0;
 	sche_list_item_conf->channel = params->target_nbr->channel;
-	
+
 	/* Note: this is not exactly compliant with the MAC spec (which requires for every beacon
 	 * in release 1.x
 	 */
@@ -220,7 +220,8 @@ static int dect_phy_mac_nbr_bg_scan_schedule(struct dect_phy_mac_nbr_bg_scan_par
 
 	sche_list_item_conf->cb_op_completed = dect_phy_mac_nbr_bg_scan_scheduler_op_completed_cb;
 	sche_list_item_conf->cb_op_to_mdm = dect_phy_mac_nbr_bg_scan_scheduler_op_to_mdm_cb;
-	sche_list_item_conf->cb_pdc_received = dect_phy_mac_nbr_bg_scan_pdc_received_cb;
+	//sche_list_item_conf->cb_pdc_received = dect_phy_mac_nbr_bg_scan_pdc_received_cb;
+	sche_list_item_conf->cb_pdc_received = NULL;
 
 	if (!dect_phy_api_scheduler_list_item_add(sche_list_item)) {
 		desh_error("(%s): dect_phy_api_scheduler_list_item_add failed", (__func__));
@@ -309,6 +310,8 @@ void dect_phy_mac_nbr_bg_scan_rcv_time_shift_update(uint32_t nbr_long_rd_id, uin
 		bg_scan_data->metrics.scan_info_time_shift_updated_count++;
 		bg_scan_data->metrics.scan_info_time_shift_last_value = time_shift_mdm_ticks;
 	}
+	printk("dect_phy_mac_nbr_bg_scan_rcv_time_shift_update triggered: long_rd_id=%u time_rcvd=%llu time_shift_mdm_ticks=%lld\n",
+	       nbr_long_rd_id, time_rcvd, time_shift_mdm_ticks);
 }
 
 void dect_phy_mac_nbr_bg_scan_status_print_for_target_long_rd_id(uint32_t long_rd_id)

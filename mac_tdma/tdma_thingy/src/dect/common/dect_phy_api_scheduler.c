@@ -1236,6 +1236,7 @@ static void dect_phy_api_scheduler_core_tick_th_schedule_next_frame(void)
 			}
 		} else if (op_count_trials_to_mdm >= DECT_PHY_API_SCHEDULER_OP_MAX_COUNT) {
 			/* We have sent already quite bunch of operations. Let's come back later */
+			printk("Triggered! op_count_trials_to_mdm %d\n", op_count_trials_to_mdm);
 			k_timer_start(&scheduler_timer, K_MSEC(10), K_NO_WAIT);
 			goto exit;
 		} else if (MODEM_TICKS_TO_MS(time_to_frame) >
@@ -1244,6 +1245,7 @@ static void dect_phy_api_scheduler_core_tick_th_schedule_next_frame(void)
 			k_timer_start(&scheduler_timer,
 				      K_MSEC(DECT_PHY_API_SCHEDULER_OP_TIME_WINDOW_MS / 5),
 				      K_NO_WAIT);
+			//printk("Triggered! time_to_frame %.3f ms\n", MODEM_TICKS_TO_MS(time_to_frame));
 			goto exit;
 		} else {
 			const uint64_t op_start_offset =
@@ -1255,6 +1257,7 @@ static void dect_phy_api_scheduler_core_tick_th_schedule_next_frame(void)
 			uint64_t start_time = frame_time + op_start_offset;
 
 			ret = dect_phy_api_scheduler_core_mdm_phy_op(iterator, start_time);
+			
 
 			/**************************************************************************/
 

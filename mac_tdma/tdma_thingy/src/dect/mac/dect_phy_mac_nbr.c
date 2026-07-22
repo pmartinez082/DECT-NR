@@ -170,7 +170,7 @@ bool dect_phy_mac_nbr_info_store_n_update(uint64_t const *rcv_time, uint16_t cha
 			long_rd_id, *rcv_time, time_shift_mdm_ticks);
 		nbr_ptr->beacon_msg = *beacon_msg;
 		nbr_ptr->ra_ie = *ra_ie; /* Note: storing only one RA IE */
-
+		print_update = true; /* Force print update for existing neighbor */
 		if (print_update) {
 			desh_print("Neighbor with long rd id %u (0x%08x), short rd id %u (0x%04x), "
 				"nw (24bit MSB: %u (0x%06x), 8bit LSB: %u (0x%02x)), channel %d\n"
@@ -183,6 +183,7 @@ bool dect_phy_mac_nbr_info_store_n_update(uint64_t const *rcv_time, uint16_t cha
 	k_mutex_unlock(&nbr_list_mutex);
 	return done;
 }
+
 
 void dect_phy_mac_nbr_status_print(void)
 {
