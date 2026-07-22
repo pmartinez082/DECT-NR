@@ -92,7 +92,6 @@ static struct dect_phy_ctrl_data {
 	bool rssi_scan_cmd_running;
 	struct dect_phy_rssi_scan_params rssi_scan_params;
 	dect_phy_ctrl_rssi_scan_completed_callback_t rssi_scan_complete_cb;
-
 	/* Registered callbacks for ext command usage */
 	struct dect_phy_ctrl_ext_callbacks ext_cmd;
 
@@ -813,7 +812,7 @@ dect_phy_ctrl_mdm_on_rx_pcc_cb(const struct nrf_modem_dect_phy_pcc_event *evt,
 	struct dect_phy_common_op_pcc_rcv_params ctrl_pcc_op_params;
 
 	ctrl_data.last_received_stf_start_time = evt->stf_start_time;
-
+	printk("PCC %f", MODEM_TICKS_TO_MS(evt->stf_start_time));
 	if (evt->header_status == NRF_MODEM_DECT_PHY_HDR_STATUS_VALID) {
 		struct dect_phy_ctrl_field_common *phy_h = (void *)&evt->hdr;
 		const uint8_t *p_ptr = (uint8_t *)&evt->hdr;
@@ -854,7 +853,7 @@ dect_phy_ctrl_mdm_on_rx_pcc_cb(const struct nrf_modem_dect_phy_pcc_event *evt,
 	if (ctrl_data.ext_cmd.direct_pcc_rcv_cb != NULL) {
 		ctrl_data.ext_cmd.direct_pcc_rcv_cb(&ctrl_pcc_op_params);
 	}
-
+	
 	dect_phy_ctrl_msgq_data_op_add(DECT_PHY_CTRL_OP_PHY_API_MDM_RX_PCC,
 				       (void *)&ctrl_pcc_op_params,
 				       sizeof(struct dect_phy_common_op_pcc_rcv_params));

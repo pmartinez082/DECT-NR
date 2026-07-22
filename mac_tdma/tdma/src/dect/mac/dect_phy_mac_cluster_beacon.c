@@ -140,7 +140,7 @@ static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
 static void cluster_schedule_tdma(uint64_t superframe_start_time)
 {
 	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-	uint32_t op_handle_base = 5000;
+	uint32_t op_handle_base = 20000;
 
 	for (int c = 0; c < associated_clients_count; c++) {
 		struct dect_phy_mac_client_info *client = &associated_clients[c];
@@ -216,8 +216,7 @@ struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 /* Limit how many RACH RX items we pre-schedule to avoid exhausting modem RX
  * resources.
  */
-#define MAX_RACH_RX_ITEMS 99
-
+#define MAX_RACH_RX_ITEMS 50
 
 
 static void dect_phy_mac_cluster_beacon_scheduler_list_items_remove(void);
@@ -485,7 +484,7 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 	memset(&beacon_data, 0, sizeof(struct dect_phy_mac_cluster_beacon_data));
 
 	/* Init TDMA scheduling work item */
-	k_work_init(&tdma_schedule_work, tdma_schedule_work_handler);
+	//k_work_init(&tdma_schedule_work, tdma_schedule_work_handler);
 
 	/* Encode cluster beacon */
 	ret = dect_phy_mac_cluster_beacon_encode(params, &pdu_ptr, &phy_header);

@@ -1236,6 +1236,7 @@ static void dect_phy_api_scheduler_core_tick_th_schedule_next_frame(void)
 			}
 		} else if (op_count_trials_to_mdm >= DECT_PHY_API_SCHEDULER_OP_MAX_COUNT) {
 			/* We have sent already quite bunch of operations. Let's come back later */
+			printk("Triggered! op_count_trials_to_mdm %d\n", op_count_trials_to_mdm);
 			k_timer_start(&scheduler_timer, K_MSEC(10), K_NO_WAIT);
 			goto exit;
 		} else if (MODEM_TICKS_TO_MS(time_to_frame) >

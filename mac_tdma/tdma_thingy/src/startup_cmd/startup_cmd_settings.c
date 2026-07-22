@@ -142,8 +142,8 @@ static struct settings_handler cfg = { .name = STARTUP_CMD_SETTINGS_KEY,
 
 int startup_cmd_settings_init(void)
 {
-	int err;
 
+	int err;
 	memset(&startup_cmd_data, 0, sizeof(startup_cmd_data));
 	startup_cmd_data.starttime = 2;
 	strcpy(startup_cmd_data.cmd[0].cmd_str,
@@ -158,6 +158,8 @@ int startup_cmd_settings_init(void)
 			(__func__), err);
 		return err;
 	}
+
+
 	err = settings_register(&cfg);
 	if (err) {
 		desh_error("(%s): Cannot register settings handler %d", (__func__), err);
