@@ -134,72 +134,7 @@ static void dect_phy_mac_free_slots(struct dect_phy_mac_client_info *client)
 }
 
 
-/*----------------------------------------------------------------------------*/
-/* Server-side TDMA scheduling: unicast per associated client */
 
-static void cluster_schedule_tdma(uint64_t superframe_start_time)
-{
-	struct dect_phy_settings *current_settings = dect_common_settings_ref_get();
-	uint32_t op_handle_base = 20000;
-
-	for (int c = 0; c < associated_clients_count; c++) {
-		struct dect_phy_mac_client_info *client = &associated_clients[c];
-
-		if (client->assigned_slot_start == 0xFFU) {
-			continue;
-		}
-
-	
-	uint8_t frame_offset = client->assigned_slot_start / DECT_RADIO_FRAME_SLOT_COUNT;
-
-	uint8_t slot_in_frame = client->assigned_slot_start % DECT_RADIO_FRAME_SLOT_COUNT;
-
-		uint64_t tx_frame_time = superframe_start_time +
-			(frame_offset * DECT_RADIO_FRAME_DURATION_IN_MODEM_TICKS);
-
-		struct dect_phy_api_scheduler_list_item_config *conf;
-		struct dect_phy_api_scheduler_list_item *item =
-			dect_phy_api_scheduler_list_item_alloc_tx_element(&conf);
-
-		if (!item) {
-			desh_error("TDMA alloc failed for client %u", client->client_id);
-			continue;
-		}
-
-		conf->channel = beacon_data.start_params.beacon_channel;
-		conf->frame_time = tx_frame_time;
-		conf->start_slot = slot_in_frame;
-		conf->length_slots = client->num_slots_needed;
-		conf->length_subslots = 0;
-		conf->interval_mdm_ticks = 0; /* one-shot; re-scheduled each beacon */
-
-		conf->address_info.network_id = current_settings->common.network_id;
-		conf->address_info.transmitter_long_rd_id = current_settings->common.transmitter_id;
-		conf->address_info.receiver_long_rd_id = client->client_id;
-
-		item->priority = DECT_PRIORITY1_TX;
-		item->phy_op_handle = op_handle_base + (uint32_t)c;
-
-		if (!dect_phy_api_scheduler_list_item_add(item)) {
-			desh_error("TDMA schedule failed for client %u", client->client_id);
-			dect_phy_api_scheduler_list_item_dealloc(item);
-		} else {
-			printk("Scheduled Client %u at Frame +%u, Slot %u",
-				   client->client_id, frame_offset, slot_in_frame);
-		}
-	}
-}
-
-/* Work item to defer TDMA scheduling out of ISR context */
-static void tdma_schedule_work_handler(struct k_work *work)
-{
-	ARG_UNUSED(work);
-
-	/* Use last recorded beacon TX time as superframe start */
-	cluster_schedule_tdma(beacon_data.last_tx_frame_time);
-}
-
-static struct k_work tdma_schedule_work;
 
 struct dect_phy_mac_cluster_beacon_lms_rssi_scan_data {
 	int8_t busy_rssi_limit;
@@ -444,10 +379,6 @@ static void dect_phy_mac_cluster_beacon_to_mdm_cb(
 		/* Print current frame_time */
 		//printk("Beacon fired: frame_time=%f\n", MODEM_TICKS_TO_MS(frame_time));	
 
-		/* TDMA scheduling temporarily disabled to avoid ISR mutex use.
-		 * It can be re‑enabled by submitting tdma_schedule_work from
-		 * thread context instead of this modem callback.
-		 */
 	}
 }
 uint64_t dect_phy_mac_cluster_beacon_last_tx_frame_time_get(void)
@@ -483,8 +414,6 @@ int dect_phy_mac_cluster_beacon_tx_start(struct dect_phy_mac_beacon_start_params
 	memset(encoded_beacon_pdu, 0, DECT_DATA_MAX_LEN);
 	memset(&beacon_data, 0, sizeof(struct dect_phy_mac_cluster_beacon_data));
 
-	/* Init TDMA scheduling work item */
-	//k_work_init(&tdma_schedule_work, tdma_schedule_work_handler);
 
 	/* Encode cluster beacon */
 	ret = dect_phy_mac_cluster_beacon_encode(params, &pdu_ptr, &phy_header);
