@@ -33,15 +33,19 @@ total_lost     = {}  # tx_id -> total packets lost across completed bursts
 PDC_LINE_RE = re.compile(r"PDC\s+([\d.]+)\s+Seq:(\d+)\s+Tx:(\d+)\s+Temp:(\d+)")
 
 
+import os
+
 def follow(file):
     file.seek(0, 2)
     while True:
         line = file.readline()
         if not line:
+            # detect truncation: if file shrank below our position, restart from 0
+            if file.tell() > os.fstat(file.fileno()).st_size:
+                file.seek(0)
             time.sleep(0.05)
             continue
         yield line
-
 
 def burst_window_index(tx_id, frame_time):
     if tx_id not in burst_epoch:

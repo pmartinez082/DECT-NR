@@ -3,3 +3,4 @@ node_modules
 prometheus_remote.yml
 data
 logs/master_output.txt
+*.csv
